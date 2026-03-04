@@ -94,7 +94,7 @@ Respond with a JSON object matching this structure exactly:
 export async function analyzeVideo(
   videoFile: File,
   players: MatchPlayer[],
-  onProgress?: (msg: string) => void,
+  onProgress?: (msg: string, pct?: number) => void,
 ): Promise<MatchAnalysis> {
 
   const playerContext = players.map(p => {
@@ -102,8 +102,10 @@ export async function analyzeVideo(
     return `- ${p.player_name} (ID: ${p.player_id}, Team ${p.team}, Current Rating: ${stored?.current_rating ?? 2.5})`;
   }).join('\n');
 
+  const sizeMB = (videoFile.size / (1024 * 1024)).toFixed(0);
+
   // Step 1: Get upload session URL
-  onProgress?.('Creating upload session...');
+  onProgress?.('Creating upload session...', 5);
 
   const sessionRes = await fetch('/api/upload-session', {
     method: 'POST',
@@ -122,25 +124,39 @@ export async function analyzeVideo(
 
   const { uploadUrl } = await sessionRes.json();
 
-  // Step 2: Upload video directly to Google's servers
-  onProgress?.(`Uploading video (${(videoFile.size / (1024 * 1024)).toFixed(0)}MB)...`);
+  // Step 2: Upload video to Google with real progress tracking via XHR
+  onProgress?.(`Uploading video (0% of ${sizeMB}MB)...`, 10);
 
-  const uploadRes = await fetch(uploadUrl, {
-    method: 'PUT',
-    headers: {
-      'Content-Length': String(videoFile.size),
-      'X-Goog-Upload-Offset': '0',
-      'X-Goog-Upload-Command': 'upload, finalize',
-    },
-    body: videoFile,
+  const uploadResult: any = await new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', uploadUrl);
+    xhr.setRequestHeader('X-Goog-Upload-Offset', '0');
+    xhr.setRequestHeader('X-Goog-Upload-Command', 'upload, finalize');
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        const pct = Math.round((e.loaded / e.total) * 100);
+        const uploadedMB = (e.loaded / (1024 * 1024)).toFixed(0);
+        onProgress?.(`Uploading video (${pct}% — ${uploadedMB}/${sizeMB}MB)...`, 10 + Math.round(pct * 0.4));
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(JSON.parse(xhr.responseText));
+        } catch {
+          reject(new Error('Upload succeeded but response was not valid JSON'));
+        }
+      } else {
+        reject(new Error(`Video upload failed: ${xhr.status} ${xhr.responseText}`));
+      }
+    };
+
+    xhr.onerror = () => reject(new Error('Video upload failed — network error'));
+    xhr.send(videoFile);
   });
 
-  if (!uploadRes.ok) {
-    const errText = await uploadRes.text();
-    throw new Error(`Video upload failed: ${errText}`);
-  }
-
-  const uploadResult = await uploadRes.json();
   const fileName = uploadResult.file?.name;
 
   if (!fileName) {
@@ -148,27 +164,39 @@ export async function analyzeVideo(
   }
 
   // Step 3: Send to our analysis endpoint (which polls for processing + runs Gemini)
-  onProgress?.('AI is watching and analyzing the full game...');
+  onProgress?.('AI is watching and analyzing the full game...', 55);
 
-  const analyzeRes = await fetch('/api/analyze', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      systemPrompt: ANALYSIS_SYSTEM_PROMPT,
-      playerContext,
-      fileName,
-      mimeType: videoFile.type || 'video/mp4',
-    }),
-  });
+  // Pulse the progress while we wait for the AI
+  const pulseInterval = setInterval(() => {
+    onProgress?.('AI is watching and analyzing the full game...', undefined);
+  }, 8000);
 
-  if (!analyzeRes.ok) {
-    const err = await analyzeRes.text();
-    throw new Error(`Analysis failed: ${err}`);
+  try {
+    const analyzeRes = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemPrompt: ANALYSIS_SYSTEM_PROMPT,
+        playerContext,
+        fileName,
+        mimeType: videoFile.type || 'video/mp4',
+      }),
+    });
+
+    clearInterval(pulseInterval);
+
+    if (!analyzeRes.ok) {
+      const err = await analyzeRes.text();
+      throw new Error(`Analysis failed: ${err}`);
+    }
+
+    const result = await analyzeRes.json();
+    onProgress?.('Analysis complete!', 100);
+    return result as MatchAnalysis;
+  } catch (err) {
+    clearInterval(pulseInterval);
+    throw err;
   }
-
-  const result = await analyzeRes.json();
-  onProgress?.('Analysis complete!');
-  return result as MatchAnalysis;
 }
 
 export function applyRatingUpdates(analysis: MatchAnalysis, matchId?: string) {

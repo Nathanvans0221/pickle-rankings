@@ -88,16 +88,14 @@ export function UploadPage() {
 
     try {
       setProgress('Uploading video to Gemini AI...');
-      setProgressPct(10);
+      setProgressPct(5);
 
       const analysis = await analyzeVideo(
         videoFile,
         matchPlayers,
-        msg => {
+        (msg, pct) => {
           setProgress(msg);
-          if (msg.includes('Uploading')) setProgressPct(20);
-          if (msg.includes('watching')) setProgressPct(50);
-          if (msg.includes('complete')) setProgressPct(90);
+          if (pct !== undefined) setProgressPct(pct);
         },
       );
 
@@ -275,7 +273,11 @@ export function UploadPage() {
           <Loader2 size={40} className="text-pickle mx-auto mb-4 animate-spin" />
           <h2 className="text-xl font-semibold text-zinc-200 mb-2">Analyzing Full Game</h2>
           <p className="text-sm text-zinc-400 mb-2">{progress}</p>
-          <p className="text-xs text-zinc-600 mb-6">Gemini watches your entire video — this takes 1-3 minutes</p>
+          <p className="text-xs text-zinc-600 mb-6">
+            {progressPct < 50
+              ? 'Uploading your video to Google servers...'
+              : 'Gemini + Claude are analyzing every rally — this can take 2-5 minutes for long videos'}
+          </p>
           <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden max-w-md mx-auto">
             <div
               className="h-full bg-pickle rounded-full transition-all duration-500"
