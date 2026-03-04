@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
-import { Film, Play, Loader2, AlertCircle, Settings, CheckCircle } from 'lucide-react';
+import { Film, Play, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { getPlayers, addMatch, updateMatch, addPlayer } from '../lib/storage';
 import { extractFrames } from '../lib/frames';
@@ -24,8 +24,7 @@ export function UploadPage() {
   const [progress, setProgress] = useState('');
   const [progressPct, setProgressPct] = useState(0);
   const [error, setError] = useState('');
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem(API_KEY_STORAGE) || '');
-  const [showApiKey, setShowApiKey] = useState(false);
+  const [apiKey] = useState(() => localStorage.getItem(API_KEY_STORAGE) || '');
   const [newPlayerName, setNewPlayerName] = useState('');
   const [matchId, setMatchId] = useState('');
 
@@ -138,24 +137,9 @@ export function UploadPage() {
       <h1 className="text-3xl font-bold mb-2">Analyze Game</h1>
       <p className="text-zinc-400 text-sm mb-8">Upload a pickleball game video for AI analysis</p>
 
-      {/* API Key Notice */}
-      {!apiKey && (
-        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mb-6 flex items-start gap-3">
-          <Settings size={18} className="text-yellow-400 shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm text-yellow-300 font-medium">API Key Required</p>
-            <p className="text-xs text-yellow-400/70 mt-1">
-              Video analysis uses Claude's vision AI. Enter your Anthropic API key below.
-            </p>
-            <input
-              type="password"
-              placeholder="sk-ant-..."
-              value={apiKey}
-              onChange={e => setApiKey(e.target.value)}
-              className="mt-2 w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-pickle text-sm"
-            />
-          </div>
-        </div>
+      {/* API key is configured server-side */}
+      {false && (
+        <div className="hidden" />
       )}
 
       {/* Step 1: Upload */}
@@ -365,42 +349,6 @@ export function UploadPage() {
         </div>
       )}
 
-      {/* API Key Modal */}
-      {showApiKey && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-zinc-900 rounded-xl border border-zinc-700 p-6 w-full max-w-md mx-4">
-            <h2 className="text-lg font-semibold mb-2">Anthropic API Key</h2>
-            <p className="text-sm text-zinc-400 mb-4">Required for AI video analysis. Your key is stored locally in your browser.</p>
-            <input
-              type="password"
-              placeholder="sk-ant-..."
-              value={apiKey}
-              onChange={e => setApiKey(e.target.value)}
-              autoFocus
-              className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-pickle text-sm"
-            />
-            <div className="flex justify-end gap-3 mt-4">
-              <button
-                onClick={() => setShowApiKey(false)}
-                className="px-3 py-2 text-sm text-zinc-400 hover:text-zinc-200 bg-transparent border-0 cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  localStorage.setItem(API_KEY_STORAGE, apiKey);
-                  setShowApiKey(false);
-                  startAnalysis();
-                }}
-                disabled={!apiKey.startsWith('sk-')}
-                className="px-4 py-2 bg-pickle text-zinc-950 rounded-lg text-sm font-medium hover:bg-pickle-dark disabled:opacity-40 cursor-pointer border-0"
-              >
-                Save & Continue
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
