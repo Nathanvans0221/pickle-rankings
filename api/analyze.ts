@@ -49,11 +49,20 @@ export default async function handler(req: any, res: any) {
     const ai = new GoogleGenAI({ apiKey: geminiKey });
 
     // Step 1: Download video from Vercel Blob and upload to Gemini File API
-    const videoResponse = await fetch(blobUrl);
-    if (!videoResponse.ok) {
-      throw new Error('Failed to download video from storage');
+    let videoBuffer: Buffer;
+    const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+
+    // Try with auth first, fall back to public access
+    let videoResponse = await fetch(blobUrl,
+      blobToken ? { headers: { 'Authorization': `Bearer ${blobToken}` } } : {}
+    );
+    if (!videoResponse.ok && blobToken) {
+      videoResponse = await fetch(blobUrl);
     }
-    const videoBuffer = Buffer.from(await videoResponse.arrayBuffer());
+    if (!videoResponse.ok) {
+      throw new Error(`Failed to download video from storage (status ${videoResponse.status})`);
+    }
+    videoBuffer = Buffer.from(await videoResponse.arrayBuffer());
 
     const uploadedFile = await ai.files.upload({
       file: new Blob([videoBuffer], { type: mimeType || 'video/mp4' }),

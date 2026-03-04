@@ -19,6 +19,7 @@ export default async function handler(req: any, res: any) {
       body,
       request: req,
       onBeforeGenerateToken: async () => ({
+        access: 'public' as const,
         allowedContentTypes: ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm', 'video/x-matroska', 'video/MP2T'],
         maximumSizeInBytes: 2 * 1024 * 1024 * 1024, // 2GB
       }),
