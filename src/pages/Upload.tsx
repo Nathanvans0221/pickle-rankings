@@ -26,9 +26,21 @@ export function UploadPage() {
 
   const existingPlayers = getPlayers();
 
-  const onDrop = useCallback((accepted: File[]) => {
+  const onDrop = useCallback((accepted: File[], rejected: any[]) => {
+    if (rejected.length > 0) {
+      const reason = rejected[0]?.errors?.[0];
+      if (reason?.code === 'file-too-large') {
+        setError(`File too large (max 2GB). Your file is ${(rejected[0].file.size / (1024 * 1024 * 1024)).toFixed(1)}GB.`);
+      } else if (reason?.code === 'file-invalid-type') {
+        setError(`Unsupported file type. Please upload a video file (MP4, MOV, AVI, WebM, MKV, etc.)`);
+      } else {
+        setError(reason?.message || 'File rejected');
+      }
+      return;
+    }
     const file = accepted[0];
     if (file) {
+      setError('');
       setVideoFile(file);
       setVideoPreviewUrl(URL.createObjectURL(file));
       setStep('players');
@@ -37,7 +49,7 @@ export function UploadPage() {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { 'video/*': ['.mp4', '.mov', '.avi', '.webm'] },
+    accept: { 'video/*': ['.mp4', '.mov', '.avi', '.webm', '.mkv', '.m4v', '.ts', '.mts'] },
     maxFiles: 1,
     maxSize: 2 * 1024 * 1024 * 1024, // 2GB — Gemini File API limit
   });
@@ -133,6 +145,11 @@ export function UploadPage() {
           <p className="text-lg font-medium text-zinc-300">Drop your game video here</p>
           <p className="text-sm text-zinc-500 mt-1">or click to browse &middot; MP4, MOV, AVI, WebM up to 2GB</p>
           <p className="text-xs text-zinc-600 mt-3">Powered by Gemini 2.5 Pro — watches your entire game, not just screenshots</p>
+          {error && (
+            <div className="mt-4 px-4 py-2 bg-red-500/10 border border-red-500/30 rounded-lg">
+              <p className="text-sm text-red-400">{error}</p>
+            </div>
+          )}
         </div>
       )}
 
