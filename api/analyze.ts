@@ -1,5 +1,6 @@
 import { GoogleGenAI, createUserContent, createPartFromUri } from '@google/genai';
 import Anthropic from '@anthropic-ai/sdk';
+import { del } from '@vercel/blob';
 
 export const config = { maxDuration: 300 };
 
@@ -33,31 +34,50 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { systemPrompt, playerContext, fileName, mimeType } = req.body;
+  const { systemPrompt, playerContext, blobUrl, mimeType } = req.body;
   const geminiKey = process.env.GEMINI_API_KEY;
   const claudeKey = process.env.ANTHROPIC_API_KEY;
 
   if (!geminiKey) {
     return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
   }
-  if (!fileName) {
-    return res.status(400).json({ error: 'No fileName provided' });
+  if (!blobUrl) {
+    return res.status(400).json({ error: 'No blobUrl provided' });
   }
 
   try {
     const ai = new GoogleGenAI({ apiKey: geminiKey });
 
+    // Step 1: Download video from Vercel Blob and upload to Gemini File API
+    const videoResponse = await fetch(blobUrl);
+    if (!videoResponse.ok) {
+      throw new Error('Failed to download video from storage');
+    }
+    const videoBuffer = Buffer.from(await videoResponse.arrayBuffer());
+
+    const uploadedFile = await ai.files.upload({
+      file: new Blob([videoBuffer], { type: mimeType || 'video/mp4' }),
+      config: { mimeType: mimeType || 'video/mp4' },
+    });
+
     // Poll until file is ACTIVE
-    let file = await ai.files.get({ name: fileName });
+    let file = await ai.files.get({ name: uploadedFile.name! });
     let attempts = 0;
     while (file.state === 'PROCESSING' && attempts < 120) {
       await new Promise(r => setTimeout(r, 3000));
-      file = await ai.files.get({ name: fileName });
+      file = await ai.files.get({ name: uploadedFile.name! });
       attempts++;
     }
 
     if (file.state !== 'ACTIVE') {
       throw new Error(`Video processing failed. State: ${file.state}`);
+    }
+
+    // Clean up the Vercel Blob now that Gemini has the file
+    try {
+      await del(blobUrl);
+    } catch {
+      // non-critical
     }
 
     // ===== PHASE 1: Gemini watches the video and produces observations =====
@@ -80,7 +100,6 @@ Watch the ENTIRE video and produce your detailed observation report.`,
     let analysisText: string;
 
     if (claudeKey) {
-      // Dual-model: Claude does the expert analysis based on Gemini's observations
       const claude = new Anthropic({ apiKey: claudeKey });
 
       const claudeResponse = await claude.messages.create({
@@ -115,7 +134,6 @@ Return ONLY valid JSON matching the specified structure. No markdown, no code fe
 
       analysisText = claudeResponse.content[0].type === 'text' ? claudeResponse.content[0].text : '';
     } else {
-      // Fallback: Gemini-only mode if no Claude key
       const geminiAnalysis = await ai.models.generateContent({
         model: 'gemini-2.5-pro',
         contents: createUserContent([
@@ -141,13 +159,12 @@ Return ONLY valid JSON matching the specified structure. No markdown, no code fe
     const cleaned = analysisText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     const analysis = JSON.parse(cleaned);
 
-    // Attach the raw observations for transparency
     analysis.gemini_observations = observations;
     analysis.analysis_mode = claudeKey ? 'dual-model (Gemini + Claude)' : 'gemini-only';
 
-    // Clean up
+    // Clean up Gemini file
     try {
-      await ai.files.delete({ name: fileName });
+      await ai.files.delete({ name: uploadedFile.name! });
     } catch {
       // ignore
     }

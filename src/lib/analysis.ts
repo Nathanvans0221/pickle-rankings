@@ -1,3 +1,4 @@
+import { upload } from '@vercel/blob/client';
 import type { MatchAnalysis, MatchPlayer } from '../types';
 import { getPlayer, getPlayers, savePlayers } from './storage';
 
@@ -87,9 +88,8 @@ Respond with a JSON object matching this structure exactly:
 
 /**
  * Full video analysis pipeline:
- * 1. Get a resumable upload URL from our server (which talks to Gemini File API)
- * 2. Upload the video directly from browser to Google's servers
- * 3. Send the file name to our analysis endpoint (which polls + runs Gemini)
+ * 1. Upload video to Vercel Blob (handles large files, CORS, progress natively)
+ * 2. Send blob URL to our analyze endpoint (which downloads → uploads to Gemini → runs AI)
  */
 export async function analyzeVideo(
   videoFile: File,
@@ -104,99 +104,46 @@ export async function analyzeVideo(
 
   const sizeMB = (videoFile.size / (1024 * 1024)).toFixed(0);
 
-  // Step 1: Get upload session URL
-  onProgress?.('Creating upload session...', 5);
+  // Step 1: Upload video to Vercel Blob with progress tracking
+  onProgress?.(`Uploading video (${sizeMB}MB)...`, 5);
 
-  const sessionRes = await fetch('/api/upload-session', {
+  let lastPct = 0;
+  const blob = await upload(videoFile.name, videoFile, {
+    access: 'public',
+    handleUploadUrl: '/api/upload-video',
+    onUploadProgress: (e) => {
+      const pct = Math.round(e.percentage);
+      if (pct > lastPct) {
+        lastPct = pct;
+        const uploadedMB = Math.round((pct / 100) * videoFile.size / (1024 * 1024));
+        onProgress?.(`Uploading video (${pct}% — ${uploadedMB}/${sizeMB}MB)...`, 5 + Math.round(pct * 0.45));
+      }
+    },
+  });
+
+  onProgress?.('Video uploaded. AI is analyzing the full game...', 55);
+
+  // Step 2: Send blob URL to our analyze endpoint
+  // Server downloads from blob → uploads to Gemini → runs Gemini + Claude analysis
+  const analyzeRes = await fetch('/api/analyze', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      fileName: videoFile.name,
-      fileSize: videoFile.size,
+      systemPrompt: ANALYSIS_SYSTEM_PROMPT,
+      playerContext,
+      blobUrl: blob.url,
       mimeType: videoFile.type || 'video/mp4',
     }),
   });
 
-  if (!sessionRes.ok) {
-    const err = await sessionRes.json();
-    throw new Error(err.error || 'Failed to create upload session');
+  if (!analyzeRes.ok) {
+    const err = await analyzeRes.text();
+    throw new Error(`Analysis failed: ${err}`);
   }
 
-  const { uploadUrl } = await sessionRes.json();
-
-  // Step 2: Upload video to Google with real progress tracking via XHR
-  onProgress?.(`Uploading video (0% of ${sizeMB}MB)...`, 10);
-
-  const uploadResult: any = await new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('PUT', uploadUrl);
-    xhr.setRequestHeader('X-Goog-Upload-Offset', '0');
-    xhr.setRequestHeader('X-Goog-Upload-Command', 'upload, finalize');
-
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) {
-        const pct = Math.round((e.loaded / e.total) * 100);
-        const uploadedMB = (e.loaded / (1024 * 1024)).toFixed(0);
-        onProgress?.(`Uploading video (${pct}% — ${uploadedMB}/${sizeMB}MB)...`, 10 + Math.round(pct * 0.4));
-      }
-    };
-
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          resolve(JSON.parse(xhr.responseText));
-        } catch {
-          reject(new Error('Upload succeeded but response was not valid JSON'));
-        }
-      } else {
-        reject(new Error(`Video upload failed: ${xhr.status} ${xhr.responseText}`));
-      }
-    };
-
-    xhr.onerror = () => reject(new Error('Video upload failed — network error'));
-    xhr.send(videoFile);
-  });
-
-  const fileName = uploadResult.file?.name;
-
-  if (!fileName) {
-    throw new Error('Upload succeeded but no file name returned');
-  }
-
-  // Step 3: Send to our analysis endpoint (which polls for processing + runs Gemini)
-  onProgress?.('AI is watching and analyzing the full game...', 55);
-
-  // Pulse the progress while we wait for the AI
-  const pulseInterval = setInterval(() => {
-    onProgress?.('AI is watching and analyzing the full game...', undefined);
-  }, 8000);
-
-  try {
-    const analyzeRes = await fetch('/api/analyze', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        systemPrompt: ANALYSIS_SYSTEM_PROMPT,
-        playerContext,
-        fileName,
-        mimeType: videoFile.type || 'video/mp4',
-      }),
-    });
-
-    clearInterval(pulseInterval);
-
-    if (!analyzeRes.ok) {
-      const err = await analyzeRes.text();
-      throw new Error(`Analysis failed: ${err}`);
-    }
-
-    const result = await analyzeRes.json();
-    onProgress?.('Analysis complete!', 100);
-    return result as MatchAnalysis;
-  } catch (err) {
-    clearInterval(pulseInterval);
-    throw err;
-  }
+  const result = await analyzeRes.json();
+  onProgress?.('Analysis complete!', 100);
+  return result as MatchAnalysis;
 }
 
 export function applyRatingUpdates(analysis: MatchAnalysis, matchId?: string) {
