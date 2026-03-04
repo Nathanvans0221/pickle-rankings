@@ -171,7 +171,7 @@ export async function analyzeVideo(
   return result as MatchAnalysis;
 }
 
-export function applyRatingUpdates(analysis: MatchAnalysis) {
+export function applyRatingUpdates(analysis: MatchAnalysis, matchId?: string) {
   const players = getPlayers();
 
   for (const pa of analysis.player_analyses) {
@@ -189,8 +189,30 @@ export function applyRatingUpdates(analysis: MatchAnalysis) {
     player.rating_history.push({
       date: new Date().toISOString(),
       rating: player.current_rating,
-      match_id: '',
+      match_id: matchId || '',
     });
+  }
+
+  savePlayers(players);
+}
+
+export function reverseRatingUpdates(analysis: MatchAnalysis, matchId: string) {
+  const players = getPlayers();
+
+  for (const pa of analysis.player_analyses) {
+    const idx = players.findIndex(p => p.id === pa.player_id);
+    if (idx < 0) continue;
+
+    const player = players[idx];
+    // Remove the rating history entry for this match
+    player.rating_history = player.rating_history.filter(e => e.match_id !== matchId);
+    player.matches_played = Math.max(0, player.matches_played - 1);
+    // Restore rating from last history entry, or default
+    if (player.rating_history.length > 0) {
+      player.current_rating = player.rating_history[player.rating_history.length - 1].rating;
+    } else {
+      player.current_rating = 2.5;
+    }
   }
 
   savePlayers(players);

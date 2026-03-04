@@ -40,6 +40,8 @@ export interface MatchAnalysis {
   rally_count: number;
   highlights: string[];
   player_analyses: PlayerAnalysis[];
+  gemini_observations?: string;
+  analysis_mode?: string;
 }
 
 export interface PlayerAnalysis {

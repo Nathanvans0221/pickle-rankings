@@ -104,7 +104,7 @@ export function UploadPage() {
       setProgressPct(95);
       setProgress('Updating player ratings...');
 
-      applyRatingUpdates(analysis);
+      applyRatingUpdates(analysis, id);
       updateMatch(id, { status: 'complete', analysis });
 
       setProgressPct(100);

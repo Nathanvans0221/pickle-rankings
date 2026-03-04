@@ -12,16 +12,40 @@ body {
   margin: 0;
 }
 
+/* Light mode: swap the zinc scale so all existing classes just work */
+.light {
+  --color-zinc-50:  oklch(0.145 0.005 286.067);
+  --color-zinc-100: oklch(0.210 0.006 285.885);
+  --color-zinc-200: oklch(0.274 0.006 286.033);
+  --color-zinc-300: oklch(0.370 0.013 285.805);
+  --color-zinc-400: oklch(0.552 0.016 285.938);
+  --color-zinc-500: oklch(0.552 0.016 285.938);
+  --color-zinc-600: oklch(0.705 0.015 286.067);
+  --color-zinc-700: oklch(0.871 0.006 286.286);
+  --color-zinc-800: oklch(0.920 0.004 286.32);
+  --color-zinc-900: oklch(0.967 0.001 286.375);
+  --color-zinc-950: oklch(0.985 0 0);
+}
+
 ::-webkit-scrollbar {
   width: 6px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
-::-webkit-scrollbar-thumb {
+.dark ::-webkit-scrollbar-thumb,
+:not(.light) ::-webkit-scrollbar-thumb {
   background: #3f3f46;
   border-radius: 3px;
 }
-::-webkit-scrollbar-thumb:hover {
+.dark ::-webkit-scrollbar-thumb:hover,
+:not(.light) ::-webkit-scrollbar-thumb:hover {
   background: #52525b;
+}
+.light ::-webkit-scrollbar-thumb {
+  background: #d4d4d8;
+  border-radius: 3px;
+}
+.light ::-webkit-scrollbar-thumb:hover {
+  background: #a1a1aa;
 }

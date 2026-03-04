@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Trophy, Upload, Users, Home } from 'lucide-react';
+import { Trophy, Upload, Users, Home, Sun, Moon } from 'lucide-react';
+import { useTheme } from '../hooks/useTheme';
 
 const NAV_ITEMS = [
   { path: '/', label: 'Dashboard', icon: Home },
@@ -10,6 +11,7 @@ const NAV_ITEMS = [
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
+  const { theme, toggle } = useTheme();
 
   return (
     <div className="min-h-screen bg-zinc-950">
@@ -19,30 +21,39 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center justify-between h-16">
             <Link to="/" className="flex items-center gap-2.5 no-underline">
               <span className="text-2xl">🏓</span>
-              <span className="text-xl font-bold text-white">
+              <span className="text-xl font-bold text-zinc-50">
                 Pickle<span className="text-pickle">Rankings</span>
               </span>
             </Link>
 
-            <nav className="flex items-center gap-1">
-              {NAV_ITEMS.map(({ path, label, icon: Icon }) => {
-                const active = location.pathname === path;
-                return (
-                  <Link
-                    key={path}
-                    to={path}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors no-underline ${
-                      active
-                        ? 'bg-pickle/10 text-pickle'
-                        : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
-                    }`}
-                  >
-                    <Icon size={18} />
-                    <span className="hidden sm:inline">{label}</span>
-                  </Link>
-                );
-              })}
-            </nav>
+            <div className="flex items-center gap-1">
+              <nav className="flex items-center gap-1">
+                {NAV_ITEMS.map(({ path, label, icon: Icon }) => {
+                  const active = location.pathname === path;
+                  return (
+                    <Link
+                      key={path}
+                      to={path}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors no-underline ${
+                        active
+                          ? 'bg-pickle/10 text-pickle'
+                          : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
+                      }`}
+                    >
+                      <Icon size={18} />
+                      <span className="hidden sm:inline">{label}</span>
+                    </Link>
+                  );
+                })}
+              </nav>
+              <button
+                onClick={toggle}
+                className="ml-2 p-2 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors cursor-pointer bg-transparent border-0"
+                title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+              >
+                {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
+            </div>
           </div>
         </div>
       </header>

@@ -1,6 +1,8 @@
+import { useState, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Target, TrendingUp, TrendingDown } from 'lucide-react';
-import { getMatch } from '../lib/storage';
+import { ArrowLeft, Target, TrendingUp, TrendingDown, RefreshCw, Loader2 } from 'lucide-react';
+import { getMatch, updateMatch } from '../lib/storage';
+import { analyzeVideo, applyRatingUpdates, reverseRatingUpdates } from '../lib/analysis';
 import { RatingBadge } from '../components/RatingBadge';
 import { PlayerAvatar } from '../components/PlayerAvatar';
 import { SkillBar } from '../components/SkillBar';
@@ -55,7 +57,52 @@ function ShotTable({ analysis }: { analysis: PlayerAnalysis }) {
 
 export function MatchDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const match = id ? getMatch(id) : undefined;
+  const [matchData, setMatchData] = useState(() => id ? getMatch(id) : undefined);
+  const [reanalyzing, setReanalyzing] = useState(false);
+  const [reanalyzeProgress, setReanalyzeProgress] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleReanalyze = useCallback(async (file: File) => {
+    if (!matchData || !id) return;
+
+    setReanalyzing(true);
+    setReanalyzeProgress('Uploading video...');
+
+    try {
+      // Reverse old rating changes
+      if (matchData.analysis) {
+        reverseRatingUpdates(matchData.analysis, id);
+      }
+
+      // Run new analysis
+      const newAnalysis = await analyzeVideo(
+        file,
+        matchData.players,
+        msg => setReanalyzeProgress(msg),
+      );
+
+      // Apply new ratings and update match
+      applyRatingUpdates(newAnalysis, id);
+      updateMatch(id, { status: 'complete', analysis: newAnalysis });
+      setMatchData(getMatch(id));
+      setReanalyzing(false);
+      setReanalyzeProgress('');
+    } catch (err: any) {
+      setReanalyzeProgress(`Error: ${err.message}`);
+      setReanalyzing(false);
+      // Re-apply old ratings if we reversed them
+      if (matchData.analysis) {
+        applyRatingUpdates(matchData.analysis, id);
+      }
+    }
+  }, [matchData, id]);
+
+  const onFileSelected = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleReanalyze(file);
+  }, [handleReanalyze]);
+
+  const match = matchData;
 
   if (!match) {
     return (
@@ -72,9 +119,25 @@ export function MatchDetailPage() {
 
   return (
     <div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="video/*"
+        className="hidden"
+        onChange={onFileSelected}
+      />
+
       <Link to="/" className="inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-zinc-200 mb-6 no-underline">
         <ArrowLeft size={16} /> Back to Dashboard
       </Link>
+
+      {/* Re-analyze Banner */}
+      {reanalyzing && (
+        <div className="bg-zinc-900 rounded-xl border border-pickle/30 p-5 mb-6 text-center">
+          <Loader2 size={24} className="text-pickle mx-auto mb-2 animate-spin" />
+          <p className="text-sm text-zinc-300">{reanalyzeProgress}</p>
+        </div>
+      )}
 
       {/* Match Header */}
       <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6 mb-6">
@@ -83,15 +146,29 @@ export function MatchDetailPage() {
             <h1 className="text-2xl font-bold">{match.video_name}</h1>
             <p className="text-sm text-zinc-400 mt-1">
               {new Date(match.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              {analysis?.analysis_mode && (
+                <span className="ml-2 text-xs text-zinc-500">({analysis.analysis_mode})</span>
+              )}
             </p>
           </div>
-          <span className={`text-xs px-3 py-1 rounded-full font-medium ${
-            match.status === 'complete' ? 'bg-pickle/10 text-pickle' :
-            match.status === 'error' ? 'bg-red-500/10 text-red-400' :
-            'bg-yellow-500/10 text-yellow-400'
-          }`}>
-            {match.status}
-          </span>
+          <div className="flex items-center gap-2">
+            {match.status === 'complete' && !reanalyzing && (
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 text-zinc-300 rounded-lg text-xs font-medium hover:bg-zinc-700 transition-colors cursor-pointer border-0"
+              >
+                <RefreshCw size={14} />
+                Re-analyze
+              </button>
+            )}
+            <span className={`text-xs px-3 py-1 rounded-full font-medium ${
+              match.status === 'complete' ? 'bg-pickle/10 text-pickle' :
+              match.status === 'error' ? 'bg-red-500/10 text-red-400' :
+              'bg-yellow-500/10 text-yellow-400'
+            }`}>
+              {match.status}
+            </span>
+          </div>
         </div>
 
         {/* Score & Teams */}
