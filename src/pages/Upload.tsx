@@ -4,14 +4,11 @@ import { useDropzone } from 'react-dropzone';
 import { Film, Play, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { getPlayers, addMatch, updateMatch, addPlayer } from '../lib/storage';
-import { extractFrames } from '../lib/frames';
-import { analyzeFrames, applyRatingUpdates } from '../lib/analysis';
+import { analyzeVideo, applyRatingUpdates } from '../lib/analysis';
 import { PlayerAvatar } from '../components/PlayerAvatar';
 import type { Match, MatchPlayer } from '../types';
 
 type Step = 'upload' | 'players' | 'analyzing' | 'done' | 'error';
-
-const API_KEY_STORAGE = 'pickle_rankings_api_key';
 
 export function UploadPage() {
   const navigate = useNavigate();
@@ -24,7 +21,6 @@ export function UploadPage() {
   const [progress, setProgress] = useState('');
   const [progressPct, setProgressPct] = useState(0);
   const [error, setError] = useState('');
-  const [apiKey] = useState(() => localStorage.getItem(API_KEY_STORAGE) || '');
   const [newPlayerName, setNewPlayerName] = useState('');
   const [matchId, setMatchId] = useState('');
 
@@ -43,7 +39,7 @@ export function UploadPage() {
     onDrop,
     accept: { 'video/*': ['.mp4', '.mov', '.avi', '.webm'] },
     maxFiles: 1,
-    maxSize: 500 * 1024 * 1024, // 500MB
+    maxSize: 2 * 1024 * 1024 * 1024, // 2GB — Gemini File API limit
   });
 
   const addExistingPlayer = (id: string, name: string) => {
@@ -72,10 +68,6 @@ export function UploadPage() {
   const startAnalysis = async () => {
     if (!videoFile || matchPlayers.length < 2) return;
 
-    if (apiKey) {
-      localStorage.setItem(API_KEY_STORAGE, apiKey);
-    }
-
     const id = uuidv4();
     setMatchId(id);
     setStep('analyzing');
@@ -89,36 +81,29 @@ export function UploadPage() {
       team2_score: team2Score ? parseInt(team2Score) : null,
       analysis: null,
       video_name: videoFile.name,
-      status: 'extracting',
+      status: 'analyzing',
       created_at: new Date().toISOString(),
     };
     addMatch(match);
 
     try {
-      // Extract frames
-      setProgress('Extracting key frames from video...');
+      setProgress('Uploading video to Gemini AI...');
       setProgressPct(10);
-      const frames = await extractFrames(videoFile, 12, (pct, msg) => {
-        setProgressPct(10 + pct * 0.4);
-        setProgress(msg);
-      });
 
-      // Analyze
-      setProgress('AI is analyzing gameplay...');
-      setProgressPct(55);
-      updateMatch(id, { status: 'analyzing' });
-
-      const analysis = await analyzeFrames(
-        frames,
+      const analysis = await analyzeVideo(
+        videoFile,
         matchPlayers,
-        apiKey,
-        msg => setProgress(msg),
+        msg => {
+          setProgress(msg);
+          if (msg.includes('Uploading')) setProgressPct(20);
+          if (msg.includes('watching')) setProgressPct(50);
+          if (msg.includes('complete')) setProgressPct(90);
+        },
       );
 
-      setProgressPct(90);
+      setProgressPct(95);
       setProgress('Updating player ratings...');
 
-      // Apply ratings
       applyRatingUpdates(analysis);
       updateMatch(id, { status: 'complete', analysis });
 
@@ -135,12 +120,7 @@ export function UploadPage() {
   return (
     <div className="max-w-3xl mx-auto">
       <h1 className="text-3xl font-bold mb-2">Analyze Game</h1>
-      <p className="text-zinc-400 text-sm mb-8">Upload a pickleball game video for AI analysis</p>
-
-      {/* API key is configured server-side */}
-      {false && (
-        <div className="hidden" />
-      )}
+      <p className="text-zinc-400 text-sm mb-8">Upload a pickleball game video — Gemini AI watches the full game</p>
 
       {/* Step 1: Upload */}
       {step === 'upload' && (
@@ -153,7 +133,8 @@ export function UploadPage() {
           <input {...getInputProps()} />
           <Film size={48} className="text-zinc-500 mx-auto mb-4" />
           <p className="text-lg font-medium text-zinc-300">Drop your game video here</p>
-          <p className="text-sm text-zinc-500 mt-1">or click to browse &middot; MP4, MOV, AVI, WebM up to 500MB</p>
+          <p className="text-sm text-zinc-500 mt-1">or click to browse &middot; MP4, MOV, AVI, WebM up to 2GB</p>
+          <p className="text-xs text-zinc-600 mt-3">Powered by Gemini 2.5 Pro — watches your entire game, not just screenshots</p>
         </div>
       )}
 
@@ -165,7 +146,7 @@ export function UploadPage() {
             <div className="mb-6 rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
               <video src={videoPreviewUrl} controls className="w-full max-h-64 object-contain bg-black" />
               <div className="px-4 py-2 border-t border-zinc-800">
-                <p className="text-sm text-zinc-400">{videoFile?.name}</p>
+                <p className="text-sm text-zinc-400">{videoFile?.name} &middot; {videoFile ? (videoFile.size / (1024 * 1024)).toFixed(0) : 0}MB</p>
               </div>
             </div>
           )}
@@ -280,7 +261,7 @@ export function UploadPage() {
             className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-pickle text-zinc-950 rounded-xl text-base font-semibold hover:bg-pickle-dark disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors border-0"
           >
             <Play size={20} />
-            Analyze Game ({matchPlayers.length} players)
+            Analyze Full Game ({matchPlayers.length} players)
           </button>
           {matchPlayers.length < 2 && (
             <p className="text-xs text-zinc-500 text-center mt-2">Add at least 2 players to continue</p>
@@ -292,11 +273,12 @@ export function UploadPage() {
       {step === 'analyzing' && (
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-8 text-center">
           <Loader2 size={40} className="text-pickle mx-auto mb-4 animate-spin" />
-          <h2 className="text-xl font-semibold text-zinc-200 mb-2">Analyzing Gameplay</h2>
-          <p className="text-sm text-zinc-400 mb-6">{progress}</p>
+          <h2 className="text-xl font-semibold text-zinc-200 mb-2">Analyzing Full Game</h2>
+          <p className="text-sm text-zinc-400 mb-2">{progress}</p>
+          <p className="text-xs text-zinc-600 mb-6">Gemini watches your entire video — this takes 1-3 minutes</p>
           <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden max-w-md mx-auto">
             <div
-              className="h-full bg-pickle rounded-full transition-all duration-300"
+              className="h-full bg-pickle rounded-full transition-all duration-500"
               style={{ width: `${progressPct}%` }}
             />
           </div>
