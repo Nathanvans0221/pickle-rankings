@@ -86,58 +86,87 @@ Respond with a JSON object matching this structure exactly:
 }`;
 
 /**
- * Convert a File to base64 string
+ * Full video analysis pipeline:
+ * 1. Get a resumable upload URL from our server (which talks to Gemini File API)
+ * 2. Upload the video directly from browser to Google's servers
+ * 3. Send the file name to our analysis endpoint (which polls + runs Gemini)
  */
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      // Strip the data URL prefix to get raw base64
-      const base64 = result.split(',')[1];
-      resolve(base64);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
 export async function analyzeVideo(
   videoFile: File,
   players: MatchPlayer[],
   onProgress?: (msg: string) => void,
 ): Promise<MatchAnalysis> {
-  onProgress?.('Preparing video for upload...');
 
   const playerContext = players.map(p => {
     const stored = getPlayer(p.player_id);
     return `- ${p.player_name} (ID: ${p.player_id}, Team ${p.team}, Current Rating: ${stored?.current_rating ?? 2.5})`;
   }).join('\n');
 
-  onProgress?.('Uploading video to AI... (this may take a minute for large files)');
+  // Step 1: Get upload session URL
+  onProgress?.('Creating upload session...');
 
-  const videoBase64 = await fileToBase64(videoFile);
-  const mimeType = videoFile.type || 'video/mp4';
+  const sessionRes = await fetch('/api/upload-session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      fileName: videoFile.name,
+      fileSize: videoFile.size,
+      mimeType: videoFile.type || 'video/mp4',
+    }),
+  });
 
+  if (!sessionRes.ok) {
+    const err = await sessionRes.json();
+    throw new Error(err.error || 'Failed to create upload session');
+  }
+
+  const { uploadUrl } = await sessionRes.json();
+
+  // Step 2: Upload video directly to Google's servers
+  onProgress?.(`Uploading video (${(videoFile.size / (1024 * 1024)).toFixed(0)}MB)...`);
+
+  const uploadRes = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Length': String(videoFile.size),
+      'X-Goog-Upload-Offset': '0',
+      'X-Goog-Upload-Command': 'upload, finalize',
+    },
+    body: videoFile,
+  });
+
+  if (!uploadRes.ok) {
+    const errText = await uploadRes.text();
+    throw new Error(`Video upload failed: ${errText}`);
+  }
+
+  const uploadResult = await uploadRes.json();
+  const fileName = uploadResult.file?.name;
+
+  if (!fileName) {
+    throw new Error('Upload succeeded but no file name returned');
+  }
+
+  // Step 3: Send to our analysis endpoint (which polls for processing + runs Gemini)
   onProgress?.('AI is watching and analyzing the full game...');
 
-  const response = await fetch('/api/analyze', {
+  const analyzeRes = await fetch('/api/analyze', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       systemPrompt: ANALYSIS_SYSTEM_PROMPT,
-      videoBase64,
-      mimeType,
       playerContext,
+      fileName,
+      mimeType: videoFile.type || 'video/mp4',
     }),
   });
 
-  if (!response.ok) {
-    const err = await response.text();
+  if (!analyzeRes.ok) {
+    const err = await analyzeRes.text();
     throw new Error(`Analysis failed: ${err}`);
   }
 
-  const result = await response.json();
+  const result = await analyzeRes.json();
   onProgress?.('Analysis complete!');
   return result as MatchAnalysis;
 }
@@ -151,7 +180,6 @@ export function applyRatingUpdates(analysis: MatchAnalysis) {
 
     const player = players[idx];
     const oldRating = player.current_rating;
-    // Blend: 70% new analysis, 30% existing rating for smoothing
     const blendedRating = player.matches_played > 0
       ? Math.round((pa.rating_after * 0.7 + oldRating * 0.3) * 10) / 10
       : pa.rating_after;

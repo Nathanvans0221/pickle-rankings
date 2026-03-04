@@ -1,40 +1,35 @@
 import { GoogleGenAI, createUserContent, createPartFromUri } from '@google/genai';
 
-export const config = { maxDuration: 300 }; // 5 min — video processing takes time
+export const config = { maxDuration: 300 }; // 5 min — video analysis takes time
 
+/**
+ * Step 3: Analyze a video that's already uploaded to Gemini File API.
+ * Accepts the file name (not URI) and polls until ACTIVE, then runs analysis.
+ */
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { systemPrompt, playerContext, videoBase64, mimeType } = req.body;
+  const { systemPrompt, playerContext, fileName, mimeType } = req.body;
   const key = process.env.GEMINI_API_KEY;
 
   if (!key) {
-    return res.status(400).json({ error: 'No Gemini API key configured. Set GEMINI_API_KEY env var on Vercel.' });
+    return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
   }
-  if (!videoBase64) {
-    return res.status(400).json({ error: 'No video data provided' });
+  if (!fileName) {
+    return res.status(400).json({ error: 'No fileName provided' });
   }
 
   try {
     const ai = new GoogleGenAI({ apiKey: key });
 
-    // Upload the video to Gemini File API
-    const videoBuffer = Buffer.from(videoBase64, 'base64');
-    const blob = new Blob([videoBuffer], { type: mimeType || 'video/mp4' });
-
-    const uploadedFile = await ai.files.upload({
-      file: blob,
-      config: { mimeType: mimeType || 'video/mp4' },
-    });
-
-    // Wait for file to finish processing
-    let file = await ai.files.get({ name: uploadedFile.name! });
+    // Poll until file is ACTIVE (done processing)
+    let file = await ai.files.get({ name: fileName });
     let attempts = 0;
-    while (file.state === 'PROCESSING' && attempts < 60) {
+    while (file.state === 'PROCESSING' && attempts < 120) {
       await new Promise(r => setTimeout(r, 3000));
-      file = await ai.files.get({ name: uploadedFile.name! });
+      file = await ai.files.get({ name: fileName });
       attempts++;
     }
 
@@ -42,11 +37,11 @@ export default async function handler(req: any, res: any) {
       throw new Error(`Video processing failed. State: ${file.state}`);
     }
 
-    // Analyze the full video with Gemini
+    // Analyze the full video
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-pro',
       contents: createUserContent([
-        createPartFromUri(file.uri!, file.mimeType!),
+        createPartFromUri(file.uri!, mimeType || 'video/mp4'),
         `${systemPrompt}
 
 Players in this match:
@@ -72,14 +67,12 @@ Return ONLY valid JSON matching the specified structure. No markdown, no code fe
     });
 
     const text = response.text || '';
-
-    // Parse JSON from response (strip any accidental markdown fences)
     const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     const analysis = JSON.parse(cleaned);
 
-    // Clean up the uploaded file
+    // Clean up uploaded file
     try {
-      await ai.files.delete({ name: uploadedFile.name! });
+      await ai.files.delete({ name: fileName });
     } catch {
       // ignore cleanup errors
     }
