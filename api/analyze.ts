@@ -8,13 +8,17 @@ export default async function handler(req: any, res: any) {
   }
 
   const { apiKey, systemPrompt, images, playerContext } = req.body;
+  const key = apiKey || process.env.ANTHROPIC_API_KEY;
 
-  if (!apiKey || !images?.length) {
-    return res.status(400).json({ error: 'Missing apiKey or images' });
+  if (!key) {
+    return res.status(400).json({ error: 'No API key configured. Set ANTHROPIC_API_KEY env var on Vercel.' });
+  }
+  if (!images?.length) {
+    return res.status(400).json({ error: 'No images provided' });
   }
 
   try {
-    const client = new Anthropic({ apiKey });
+    const client = new Anthropic({ apiKey: key });
 
     const imageBlocks = images.map((base64: string) => ({
       type: 'image' as const,

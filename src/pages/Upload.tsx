@@ -72,12 +72,10 @@ export function UploadPage() {
 
   const startAnalysis = async () => {
     if (!videoFile || matchPlayers.length < 2) return;
-    if (!apiKey) {
-      setShowApiKey(true);
-      return;
-    }
 
-    localStorage.setItem(API_KEY_STORAGE, apiKey);
+    if (apiKey) {
+      localStorage.setItem(API_KEY_STORAGE, apiKey);
+    }
 
     const id = uuidv4();
     setMatchId(id);
