@@ -111,6 +111,7 @@ export async function analyzeVideo(
   const blob = await upload(videoFile.name, videoFile, {
     access: 'public',
     handleUploadUrl: '/api/upload-video',
+    addRandomSuffix: true,
     onUploadProgress: (e) => {
       const pct = Math.round(e.percentage);
       if (pct > lastPct) {
