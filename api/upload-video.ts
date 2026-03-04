@@ -21,7 +21,7 @@ export default async function handler(req: any, res: any) {
       onBeforeGenerateToken: async () => ({
         access: 'public' as const,
         allowedContentTypes: ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm', 'video/x-matroska', 'video/MP2T'],
-        maximumSizeInBytes: 2 * 1024 * 1024 * 1024, // 2GB
+        maximumSizeInBytes: 5 * 1024 * 1024 * 1024, // 5GB
       }),
       onUploadCompleted: async () => {
         // Could do post-processing here if needed

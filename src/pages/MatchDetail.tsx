@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Target, TrendingUp, TrendingDown, RefreshCw, Loader2 } from 'lucide-react';
-import { getMatch, updateMatch } from '../lib/storage';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Target, TrendingUp, TrendingDown, RefreshCw, Loader2, Trash2 } from 'lucide-react';
+import { getMatch, updateMatch, deleteMatch } from '../lib/storage';
 import { analyzeVideo, applyRatingUpdates, reverseRatingUpdates } from '../lib/analysis';
 import { RatingBadge } from '../components/RatingBadge';
 import { PlayerAvatar } from '../components/PlayerAvatar';
@@ -57,10 +57,22 @@ function ShotTable({ analysis }: { analysis: PlayerAnalysis }) {
 
 export function MatchDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [matchData, setMatchData] = useState(() => id ? getMatch(id) : undefined);
   const [reanalyzing, setReanalyzing] = useState(false);
   const [reanalyzeProgress, setReanalyzeProgress] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDelete = useCallback(() => {
+    if (!matchData || !id) return;
+    // Reverse rating changes before deleting
+    if (matchData.analysis) {
+      reverseRatingUpdates(matchData.analysis, id);
+    }
+    deleteMatch(id);
+    navigate('/');
+  }, [matchData, id, navigate]);
 
   const handleReanalyze = useCallback(async (file: File) => {
     if (!matchData || !id) return;
@@ -152,14 +164,42 @@ export function MatchDetailPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {match.status === 'complete' && !reanalyzing && (
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 text-zinc-300 rounded-lg text-xs font-medium hover:bg-zinc-700 transition-colors cursor-pointer border-0"
-              >
-                <RefreshCw size={14} />
-                Re-analyze
-              </button>
+            {!reanalyzing && !confirmDelete && (
+              <>
+                {match.status === 'complete' && (
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 text-zinc-300 rounded-lg text-xs font-medium hover:bg-zinc-700 transition-colors cursor-pointer border-0"
+                  >
+                    <RefreshCw size={14} />
+                    Re-analyze
+                  </button>
+                )}
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 text-zinc-300 rounded-lg text-xs font-medium hover:bg-red-500/20 hover:text-red-400 transition-colors cursor-pointer border-0"
+                >
+                  <Trash2 size={14} />
+                  Delete
+                </button>
+              </>
+            )}
+            {confirmDelete && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-zinc-400">Delete this match?</span>
+                <button
+                  onClick={handleDelete}
+                  className="px-3 py-1.5 bg-red-500/20 text-red-400 rounded-lg text-xs font-medium hover:bg-red-500/30 transition-colors cursor-pointer border-0"
+                >
+                  Yes, delete
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  className="px-3 py-1.5 bg-zinc-800 text-zinc-300 rounded-lg text-xs font-medium hover:bg-zinc-700 transition-colors cursor-pointer border-0"
+                >
+                  Cancel
+                </button>
+              </div>
             )}
             <span className={`text-xs px-3 py-1 rounded-full font-medium ${
               match.status === 'complete' ? 'bg-pickle/10 text-pickle' :

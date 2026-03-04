@@ -51,7 +51,7 @@ export function UploadPage() {
     onDrop,
     accept: { 'video/*': ['.mp4', '.mov', '.avi', '.webm', '.mkv', '.m4v', '.ts', '.mts'] },
     maxFiles: 1,
-    maxSize: 2 * 1024 * 1024 * 1024, // 2GB — Gemini File API limit
+    maxSize: 5 * 1024 * 1024 * 1024, // 5GB
   });
 
   const addExistingPlayer = (id: string, name: string) => {
@@ -143,7 +143,7 @@ export function UploadPage() {
           <input {...getInputProps()} />
           <Film size={48} className="text-zinc-500 mx-auto mb-4" />
           <p className="text-lg font-medium text-zinc-300">Drop your game video here</p>
-          <p className="text-sm text-zinc-500 mt-1">or click to browse &middot; MP4, MOV, AVI, WebM up to 2GB</p>
+          <p className="text-sm text-zinc-500 mt-1">or click to browse &middot; MP4, MOV, AVI, WebM up to 5GB</p>
           <p className="text-xs text-zinc-600 mt-3">Powered by Gemini 2.5 Pro — watches your entire game, not just screenshots</p>
           {error && (
             <div className="mt-4 px-4 py-2 bg-red-500/10 border border-red-500/30 rounded-lg">

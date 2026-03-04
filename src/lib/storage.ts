@@ -80,3 +80,8 @@ export function updateMatch(id: string, updates: Partial<Match>) {
 export function getMatch(id: string): Match | undefined {
   return getMatches().find(m => m.id === id);
 }
+
+export function deleteMatch(id: string) {
+  const matches = getMatches().filter(m => m.id !== id);
+  saveMatches(matches);
+}
