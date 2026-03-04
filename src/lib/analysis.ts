@@ -108,10 +108,10 @@ export async function analyzeVideo(
   onProgress?.(`Uploading video (${sizeMB}MB)...`, 5);
 
   let lastPct = 0;
-  const blob = await upload(videoFile.name, videoFile, {
+  const uniqueName = `${Date.now()}-${videoFile.name}`;
+  const blob = await upload(uniqueName, videoFile, {
     access: 'public',
     handleUploadUrl: '/api/upload-video',
-    addRandomSuffix: true,
     onUploadProgress: (e) => {
       const pct = Math.round(e.percentage);
       if (pct > lastPct) {
