@@ -24,3 +24,10 @@ dist-ssr
 *.sw?
 .vercel
 .env*.local
+
+# iOS build artifacts
+ios/App/Pods
+ios/App/App/public
+ios/App/capacitor.config.json
+ios/App/build
+*.xcuserdata
