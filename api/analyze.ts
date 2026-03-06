@@ -2,6 +2,7 @@ import { GoogleGenAI, createUserContent, createPartFromUri, MediaResolution } fr
 import Anthropic from '@anthropic-ai/sdk';
 import { del } from '@vercel/blob';
 import { geminiWithRetry } from './_gemini-retry.js';
+import { handleCors } from './_cors.js';
 
 export const config = { maxDuration: 300 };
 
@@ -34,6 +35,7 @@ Be SPECIFIC. Use timestamps when possible. Count actual numbers. Always refer to
 Format your response as a structured text report with clear sections per player.`;
 
 export default async function handler(req: any, res: any) {
+  if (handleCors(req, res)) return;
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }

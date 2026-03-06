@@ -1,4 +1,5 @@
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
+import { handleCors } from './_cors.js';
 
 export const config = { maxDuration: 30 };
 
@@ -8,6 +9,7 @@ export const config = { maxDuration: 30 };
  * Returns a blob URL that can be passed to the analyze endpoint.
  */
 export default async function handler(req: any, res: any) {
+  if (handleCors(req, res)) return;
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }

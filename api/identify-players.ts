@@ -1,5 +1,6 @@
 import { GoogleGenAI, createUserContent, createPartFromUri, MediaResolution } from '@google/genai';
 import { geminiWithRetry } from './_gemini-retry.js';
+import { handleCors } from './_cors.js';
 
 export const config = { maxDuration: 300 };
 
@@ -34,6 +35,7 @@ Return ONLY a valid JSON array, no markdown, no code fences:
 Return between 2 and 6 players. If you see the same person from different angles, combine into one entry.`;
 
 export default async function handler(req: any, res: any) {
+  if (handleCors(req, res)) return;
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }

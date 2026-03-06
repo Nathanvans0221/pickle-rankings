@@ -1,6 +1,7 @@
 import { upload } from '@vercel/blob/client';
 import type { MatchAnalysis, MatchPlayer } from '../types';
 import { getPlayer, getPlayers, savePlayers } from './storage';
+import { apiUrl } from './config';
 
 const ANALYSIS_SYSTEM_PROMPT = `You are an elite pickleball analyst and certified coach. You are watching a FULL pickleball game video — not screenshots, the actual gameplay footage.
 
@@ -127,7 +128,7 @@ export async function uploadAndIdentifyPlayers(
   const uniqueName = `${Date.now()}-${videoFile.name}`;
   const blob = await upload(uniqueName, videoFile, {
     access: 'public',
-    handleUploadUrl: '/api/upload-video',
+    handleUploadUrl: apiUrl('/api/upload-video'),
     onUploadProgress: (e) => {
       const pct = Math.round(e.percentage);
       if (pct > lastPct) {
@@ -140,7 +141,7 @@ export async function uploadAndIdentifyPlayers(
 
   onProgress?.('Video uploaded! AI is scanning for players...', 45);
 
-  const res = await fetch('/api/identify-players', {
+  const res = await fetch(apiUrl('/api/identify-players'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ blobUrl: blob.url, mimeType: videoFile.type || 'video/mp4' }),
@@ -180,7 +181,7 @@ export async function analyzeVideoMultiPass(
 
   // Phase 1: Structure Scan
   onProgress?.('Phase 1/5: Scanning video structure...', 5);
-  const structure = await callEndpoint('/api/analyze-structure', {
+  const structure = await callEndpoint(apiUrl('/api/analyze-structure'), {
     geminiFileUri, mimeType, playerContext,
   });
   onProgress?.(`Phase 1/5: Found ${structure.segments.length} game segments`, 15);
@@ -198,7 +199,7 @@ export async function analyzeVideoMultiPass(
       15 + Math.round((i / structure.segments.length) * 30),
     );
     try {
-      const segResult = await callEndpoint('/api/analyze-segments', {
+      const segResult = await callEndpoint(apiUrl('/api/analyze-segments'), {
         geminiFileUri, mimeType,
         segments: [seg],
         playerContext,
@@ -224,7 +225,7 @@ export async function analyzeVideoMultiPass(
       45 + Math.round((i / teams.length) * 15),
     );
     try {
-      const focusResult = await callEndpoint('/api/analyze-player-focus', {
+      const focusResult = await callEndpoint(apiUrl('/api/analyze-player-focus'), {
         geminiFileUri, mimeType, playerContext,
         teamPlayers: teamPlayers.map(p => ({
           player_id: p.player_id,
@@ -245,7 +246,7 @@ export async function analyzeVideoMultiPass(
     `[${s.segment_start}s - ${s.segment_end}s]\n${s.rally_log}`,
   ).join('\n\n---\n\n');
 
-  const draftAnalysis = await callEndpoint('/api/analyze-rate', {
+  const draftAnalysis = await callEndpoint(apiUrl('/api/analyze-rate'), {
     playerContext,
     segmentObservations: allSegmentText,
     playerFocusReports,
@@ -258,7 +259,7 @@ export async function analyzeVideoMultiPass(
   onProgress?.('Phase 5/5: Calibrating and validating ratings...', 85);
   let finalAnalysis: MatchAnalysis;
   try {
-    finalAnalysis = await callEndpoint('/api/analyze-calibrate', {
+    finalAnalysis = await callEndpoint(apiUrl('/api/analyze-calibrate'), {
       draftAnalysis,
       segmentObservations: allSegmentText,
       playerFocusReports,
@@ -310,7 +311,7 @@ export async function analyzeVideo(
     const uniqueName = `${Date.now()}-${videoFile.name}`;
     const blob = await upload(uniqueName, videoFile, {
       access: 'public',
-      handleUploadUrl: '/api/upload-video',
+      handleUploadUrl: apiUrl('/api/upload-video'),
       onUploadProgress: (e) => {
         const pct = Math.round(e.percentage);
         if (pct > lastPct) {
@@ -328,7 +329,7 @@ export async function analyzeVideo(
 
   let analyzeRes: Response;
   try {
-    analyzeRes = await fetch('/api/analyze', {
+    analyzeRes = await fetch(apiUrl('/api/analyze'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

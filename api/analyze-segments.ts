@@ -1,5 +1,6 @@
 import { GoogleGenAI, createUserContent, MediaResolution } from '@google/genai';
 import { geminiWithRetry } from './_gemini-retry.js';
+import { handleCors } from './_cors.js';
 
 export const config = { maxDuration: 300 };
 
@@ -45,6 +46,7 @@ function splitSegment(seg: Segment): Segment[] {
 }
 
 export default async function handler(req: any, res: any) {
+  if (handleCors(req, res)) return;
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }

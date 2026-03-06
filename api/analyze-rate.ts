@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { handleCors } from './_cors.js';
 
 export const config = { maxDuration: 300 };
 
@@ -87,6 +88,7 @@ Respond with a JSON object matching this structure exactly:
 }`;
 
 export default async function handler(req: any, res: any) {
+  if (handleCors(req, res)) return;
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
