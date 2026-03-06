@@ -16,13 +16,16 @@ function App() {
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
-    syncFromCloud().then(pulledData => {
-      if (!pulledData) {
-        // No cloud data yet — seed from local
-        pushAllToCloud();
-      }
-      setSynced(true);
-    });
+    const timeout = setTimeout(() => setSynced(true), 3000); // never block more than 3s
+    syncFromCloud()
+      .then(pulledData => {
+        if (!pulledData) pushAllToCloud();
+      })
+      .catch(err => console.warn('[sync] startup sync failed:', err))
+      .finally(() => {
+        clearTimeout(timeout);
+        setSynced(true);
+      });
   }, []);
 
   if (!synced) {
