@@ -45,8 +45,8 @@ export function PlayersPage() {
 
       {/* Add Player Modal — bottom sheet on mobile */}
       {showAdd && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-zinc-900 rounded-t-2xl sm:rounded-2xl border border-zinc-700 p-6 w-full sm:max-w-md sm:mx-4">
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-zinc-900 rounded-t-2xl sm:rounded-2xl border border-zinc-700 p-6 w-full sm:max-w-md sm:mx-4" style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">Add Player</h2>
               <button onClick={() => setShowAdd(false)} className="min-h-[44px] min-w-[44px] flex items-center justify-center text-zinc-400 hover:text-zinc-200 bg-transparent border-0 cursor-pointer">
