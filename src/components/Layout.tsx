@@ -64,7 +64,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* Version */}
-      <footer className="text-center text-xs text-zinc-700 py-4">v1.5.0</footer>
+      <footer className="text-center text-xs text-zinc-700 py-4">v2.0.0</footer>
     </div>
   );
 }
