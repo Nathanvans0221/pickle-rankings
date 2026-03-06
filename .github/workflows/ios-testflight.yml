@@ -18,77 +18,26 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+          bundler-cache: true
 
       - name: Build web app
-        run: npm run build
+        run: npm ci && npm run build
 
-      - name: Sync Capacitor
+      - name: Sync Capacitor to iOS
         run: npx cap sync ios
 
       - name: Install CocoaPods
         run: cd ios/App && pod install
 
-      - name: Import signing certificate
+      - name: Build & upload to TestFlight
         env:
-          P12_BASE64: ${{ secrets.IOS_P12_BASE64 }}
-          P12_PASSWORD: ${{ secrets.IOS_P12_PASSWORD }}
-        run: |
-          CERT_PATH=$RUNNER_TEMP/cert.p12
-          echo -n "$P12_BASE64" | base64 --decode -o $CERT_PATH
-
-          KEYCHAIN_PATH=$RUNNER_TEMP/signing.keychain-db
-          security create-keychain -p "actions" $KEYCHAIN_PATH
-          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
-          security unlock-keychain -p "actions" $KEYCHAIN_PATH
-          security import $CERT_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
-          security set-key-partition-list -S apple-tool:,apple: -k "actions" $KEYCHAIN_PATH
-          security list-keychain -d user -s $KEYCHAIN_PATH
-
-      - name: Write App Store Connect API key
-        env:
-          API_KEY_BASE64: ${{ secrets.APPSTORE_API_KEY_BASE64 }}
-          API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
-        run: |
-          mkdir -p ~/.private_keys
-          echo -n "$API_KEY_BASE64" | base64 --decode > ~/.private_keys/AuthKey_${API_KEY_ID}.p8
-
-      - name: Build & archive
-        run: |
-          xcodebuild archive \
-            -workspace ios/App/App.xcworkspace \
-            -scheme App \
-            -configuration Release \
-            -archivePath $RUNNER_TEMP/App.xcarchive \
-            -destination 'generic/platform=iOS' \
-            -authenticationKeyPath ~/.private_keys/AuthKey_${{ secrets.APPSTORE_API_KEY_ID }}.p8 \
-            -authenticationKeyID ${{ secrets.APPSTORE_API_KEY_ID }} \
-            -authenticationKeyIssuerID ${{ secrets.APPSTORE_ISSUER_ID }} \
-            -allowProvisioningUpdates \
-            CODE_SIGN_STYLE=Automatic \
-            DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }}
-
-      - name: Export IPA
-        run: |
-          cat > $RUNNER_TEMP/ExportOptions.plist << 'PLIST'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>app-store-connect</string>
-            <key>destination</key>
-            <string>upload</string>
-          </dict>
-          </plist>
-          PLIST
-
-          xcodebuild -exportArchive \
-            -archivePath $RUNNER_TEMP/App.xcarchive \
-            -exportPath $RUNNER_TEMP/export \
-            -exportOptionsPlist $RUNNER_TEMP/ExportOptions.plist \
-            -authenticationKeyPath ~/.private_keys/AuthKey_${{ secrets.APPSTORE_API_KEY_ID }}.p8 \
-            -authenticationKeyID ${{ secrets.APPSTORE_API_KEY_ID }} \
-            -authenticationKeyIssuerID ${{ secrets.APPSTORE_ISSUER_ID }} \
-            -allowProvisioningUpdates
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPSTORE_API_KEY_CONTENT: ${{ secrets.APPSTORE_API_KEY_BASE64 }}
+          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_AUTH }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+        run: bundle exec fastlane ios beta
