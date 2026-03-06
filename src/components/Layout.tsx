@@ -62,6 +62,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {children}
       </main>
+
+      {/* Version */}
+      <footer className="text-center text-xs text-zinc-700 py-4">v1.5.0</footer>
     </div>
   );
 }

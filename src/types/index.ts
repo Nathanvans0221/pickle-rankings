@@ -32,6 +32,7 @@ export interface MatchPlayer {
   player_id: string;
   player_name: string;
   team: 1 | 2;
+  appearance?: string;
 }
 
 export interface MatchAnalysis {
@@ -42,6 +43,10 @@ export interface MatchAnalysis {
   player_analyses: PlayerAnalysis[];
   gemini_observations?: string;
   analysis_mode?: string;
+  segment_observations?: string;
+  player_focus_reports?: string[];
+  calibration_notes?: string;
+  structure_summary?: { segments: any[]; estimated_rally_count: number; estimated_duration_seconds: number };
 }
 
 export interface PlayerAnalysis {

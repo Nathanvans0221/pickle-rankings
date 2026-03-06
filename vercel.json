@@ -1,4 +1,26 @@
 {
+  "fluid": true,
+  "functions": {
+    "api/analyze.ts": {
+      "maxDuration": 300,
+      "memory": 1024
+    },
+    "api/analyze-structure.ts": {
+      "maxDuration": 300
+    },
+    "api/analyze-segments.ts": {
+      "maxDuration": 300
+    },
+    "api/analyze-player-focus.ts": {
+      "maxDuration": 300
+    },
+    "api/analyze-rate.ts": {
+      "maxDuration": 300
+    },
+    "api/analyze-calibrate.ts": {
+      "maxDuration": 300
+    }
+  },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/((?!assets/).*)", "destination": "/index.html" }

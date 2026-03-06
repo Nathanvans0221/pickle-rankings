@@ -86,25 +86,41 @@ Respond with a JSON object matching this structure exactly:
   ]
 }`;
 
+async function callEndpoint(url: string, body: any, timeoutMs = 300000): Promise<any> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export interface IdentifiedPlayer {
+  label: string;
+  description: string;
+  court_position: string;
+}
+
 /**
- * Full video analysis pipeline:
- * 1. Upload video to Vercel Blob (handles large files, CORS, progress natively)
- * 2. Send blob URL to our analyze endpoint (which downloads → uploads to Gemini → runs AI)
+ * Upload video to blob and ask Gemini to identify players by appearance.
  */
-export async function analyzeVideo(
+export async function uploadAndIdentifyPlayers(
   videoFile: File,
-  players: MatchPlayer[],
   onProgress?: (msg: string, pct?: number) => void,
-): Promise<MatchAnalysis> {
-
-  const playerContext = players.map(p => {
-    const stored = getPlayer(p.player_id);
-    return `- ${p.player_name} (ID: ${p.player_id}, Team ${p.team}, Current Rating: ${stored?.current_rating ?? 2.5})`;
-  }).join('\n');
-
+): Promise<{ players: IdentifiedPlayer[]; blobUrl: string; geminiFileUri: string }> {
   const sizeMB = (videoFile.size / (1024 * 1024)).toFixed(0);
 
-  // Step 1: Upload video to Vercel Blob with progress tracking
   onProgress?.(`Uploading video (${sizeMB}MB)...`, 5);
 
   let lastPct = 0;
@@ -117,29 +133,231 @@ export async function analyzeVideo(
       if (pct > lastPct) {
         lastPct = pct;
         const uploadedMB = Math.round((pct / 100) * videoFile.size / (1024 * 1024));
-        onProgress?.(`Uploading video (${pct}% — ${uploadedMB}/${sizeMB}MB)...`, 5 + Math.round(pct * 0.45));
+        onProgress?.(`Uploading video (${pct}% — ${uploadedMB}/${sizeMB}MB)...`, 5 + Math.round(pct * 0.35));
       }
     },
   });
 
-  onProgress?.('Video uploaded. AI is analyzing the full game...', 55);
+  onProgress?.('Video uploaded! AI is scanning for players...', 45);
 
-  // Step 2: Send blob URL to our analyze endpoint
-  // Server downloads from blob → uploads to Gemini → runs Gemini + Claude analysis
-  const analyzeRes = await fetch('/api/analyze', {
+  const res = await fetch('/api/identify-players', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      systemPrompt: ANALYSIS_SYSTEM_PROMPT,
-      playerContext,
-      blobUrl: blob.url,
-      mimeType: videoFile.type || 'video/mp4',
-    }),
+    body: JSON.stringify({ blobUrl: blob.url, mimeType: videoFile.type || 'video/mp4' }),
   });
 
+  if (!res.ok) {
+    let errDetail: string;
+    try {
+      const errJson = await res.json();
+      errDetail = errJson.error || JSON.stringify(errJson);
+    } catch {
+      errDetail = await res.text();
+    }
+    throw new Error(`Player identification failed (HTTP ${res.status}): ${errDetail}`);
+  }
+
+  const data = await res.json();
+  onProgress?.(`Found ${data.players.length} players!`, 80);
+  return { players: data.players, blobUrl: blob.url, geminiFileUri: data.geminiFileUri };
+}
+
+/**
+ * Multi-pass video analysis pipeline (5 phases).
+ * Requires geminiFileUri from the identify-players step.
+ */
+export async function analyzeVideoMultiPass(
+  players: MatchPlayer[],
+  geminiFileUri: string,
+  mimeType: string,
+  onProgress?: (msg: string, pct?: number) => void,
+): Promise<MatchAnalysis> {
+  const playerContext = players.map(p => {
+    const stored = getPlayer(p.player_id);
+    const desc = p.appearance ? `, Appearance: ${p.appearance}` : '';
+    return `- ${p.player_name} (ID: ${p.player_id}, Team ${p.team}, Current Rating: ${stored?.current_rating ?? 2.5}${desc})`;
+  }).join('\n');
+
+  // Phase 1: Structure Scan
+  onProgress?.('Phase 1/5: Scanning video structure...', 5);
+  const structure = await callEndpoint('/api/analyze-structure', {
+    geminiFileUri, mimeType, playerContext,
+  });
+  onProgress?.(`Phase 1/5: Found ${structure.segments.length} game segments`, 15);
+
+  // Phase 2: Segment Deep Analysis
+  const segmentObservations: any[] = [];
+  for (let i = 0; i < structure.segments.length; i++) {
+    const seg = structure.segments[i];
+    const startMin = Math.floor(seg.start / 60);
+    const startSec = seg.start % 60;
+    const endMin = Math.floor(seg.end / 60);
+    const endSec = seg.end % 60;
+    onProgress?.(
+      `Phase 2/5: Analyzing segment ${i + 1} of ${structure.segments.length} (Game ${seg.game_number}, ${startMin}:${String(startSec).padStart(2, '0')}-${endMin}:${String(endSec).padStart(2, '0')})...`,
+      15 + Math.round((i / structure.segments.length) * 30),
+    );
+    try {
+      const segResult = await callEndpoint('/api/analyze-segments', {
+        geminiFileUri, mimeType,
+        segments: [seg],
+        playerContext,
+      });
+      segmentObservations.push(...segResult.segmentObservations);
+    } catch (err: any) {
+      console.warn(`Segment ${i + 1} failed, skipping:`, err.message);
+    }
+  }
+  onProgress?.(`Phase 2/5: Analyzed ${segmentObservations.length} segments`, 45);
+
+  // Phase 3: Player-Focused Passes (one per team)
+  const playerFocusReports: string[] = [];
+  const team1Players = players.filter(p => p.team === 1);
+  const team2Players = players.filter(p => p.team === 2);
+  const teams = [team1Players, team2Players].filter(t => t.length > 0);
+
+  for (let i = 0; i < teams.length; i++) {
+    const teamPlayers = teams[i];
+    const teamNum = teamPlayers[0]?.team || (i + 1);
+    onProgress?.(
+      `Phase 3/5: Deep analysis of Team ${teamNum} (${teamPlayers.map(p => p.player_name).join(' & ')})...`,
+      45 + Math.round((i / teams.length) * 15),
+    );
+    try {
+      const focusResult = await callEndpoint('/api/analyze-player-focus', {
+        geminiFileUri, mimeType, playerContext,
+        teamPlayers: teamPlayers.map(p => ({
+          player_id: p.player_id,
+          player_name: p.player_name,
+          appearance: p.appearance || '',
+        })),
+      });
+      playerFocusReports.push(focusResult.focusReport);
+    } catch (err: any) {
+      console.warn(`Team ${teamNum} focus failed:`, err.message);
+    }
+  }
+  onProgress?.('Phase 3/5: Player analysis complete', 60);
+
+  // Phase 4: Comparative Rating (Claude)
+  onProgress?.('Phase 4/5: Claude is synthesizing all data and rating players...', 65);
+  const allSegmentText = segmentObservations.map(s =>
+    `[${s.segment_start}s - ${s.segment_end}s]\n${s.rally_log}`,
+  ).join('\n\n---\n\n');
+
+  const draftAnalysis = await callEndpoint('/api/analyze-rate', {
+    playerContext,
+    segmentObservations: allSegmentText,
+    playerFocusReports,
+    structureSummary: JSON.stringify(structure),
+    players: players.map(p => ({ player_id: p.player_id, player_name: p.player_name, team: p.team })),
+  });
+  onProgress?.('Phase 4/5: Draft ratings complete', 80);
+
+  // Phase 5: Calibration Challenge (Claude)
+  onProgress?.('Phase 5/5: Calibrating and validating ratings...', 85);
+  let finalAnalysis: MatchAnalysis;
+  try {
+    finalAnalysis = await callEndpoint('/api/analyze-calibrate', {
+      draftAnalysis,
+      segmentObservations: allSegmentText,
+      playerFocusReports,
+    });
+  } catch (err: any) {
+    console.warn('Calibration failed, using draft:', err.message);
+    finalAnalysis = draftAnalysis;
+  }
+
+  // Attach extra data for transparency
+  finalAnalysis.segment_observations = allSegmentText;
+  finalAnalysis.player_focus_reports = playerFocusReports;
+  finalAnalysis.structure_summary = structure;
+  finalAnalysis.analysis_mode = 'multi-pass (5-phase pipeline)';
+
+  onProgress?.('Analysis complete!', 100);
+  return finalAnalysis;
+}
+
+/**
+ * Full video analysis pipeline (single-pass fallback):
+ * 1. Upload video to Vercel Blob (or reuse existing blobUrl)
+ * 2. Send blob URL to our analyze endpoint (which downloads → uploads to Gemini → runs AI)
+ */
+export async function analyzeVideo(
+  videoFile: File,
+  players: MatchPlayer[],
+  onProgress?: (msg: string, pct?: number) => void,
+  existingBlobUrl?: string,
+): Promise<MatchAnalysis> {
+
+  const playerContext = players.map(p => {
+    const stored = getPlayer(p.player_id);
+    const desc = p.appearance ? `, Appearance: ${p.appearance}` : '';
+    return `- ${p.player_name} (ID: ${p.player_id}, Team ${p.team}, Current Rating: ${stored?.current_rating ?? 2.5}${desc})`;
+  }).join('\n');
+
+  let blobUrl: string;
+
+  if (existingBlobUrl) {
+    blobUrl = existingBlobUrl;
+    onProgress?.('Sending video to AI for analysis...', 55);
+  } else {
+    const sizeMB = (videoFile.size / (1024 * 1024)).toFixed(0);
+
+    onProgress?.(`Uploading video (${sizeMB}MB)...`, 5);
+
+    let lastPct = 0;
+    const uniqueName = `${Date.now()}-${videoFile.name}`;
+    const blob = await upload(uniqueName, videoFile, {
+      access: 'public',
+      handleUploadUrl: '/api/upload-video',
+      onUploadProgress: (e) => {
+        const pct = Math.round(e.percentage);
+        if (pct > lastPct) {
+          lastPct = pct;
+          const uploadedMB = Math.round((pct / 100) * videoFile.size / (1024 * 1024));
+          onProgress?.(`Uploading video (${pct}% — ${uploadedMB}/${sizeMB}MB)...`, 5 + Math.round(pct * 0.45));
+        }
+      },
+    });
+    blobUrl = blob.url;
+    onProgress?.('Video uploaded! Sending to AI for analysis...', 55);
+  }
+
+  onProgress?.('AI is downloading and processing the video (this takes 2-5 min)...', 60);
+
+  let analyzeRes: Response;
+  try {
+    analyzeRes = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemPrompt: ANALYSIS_SYSTEM_PROMPT,
+        playerContext,
+        blobUrl,
+        mimeType: videoFile.type || 'video/mp4',
+      }),
+    });
+  } catch (fetchError: any) {
+    // Network-level failure (timeout, connection reset, etc.)
+    throw new Error(
+      `Server connection lost during analysis. This usually means the analysis timed out. ` +
+      `Try a shorter video clip (under 5 minutes). Error: ${fetchError.message}`
+    );
+  }
+
   if (!analyzeRes.ok) {
-    const err = await analyzeRes.text();
-    throw new Error(`Analysis failed: ${err}`);
+    let errDetail: string;
+    try {
+      const errJson = await analyzeRes.json();
+      errDetail = errJson.error || JSON.stringify(errJson);
+      if (errJson.failedAfterSeconds) {
+        errDetail += ` (failed after ${errJson.failedAfterSeconds}s)`;
+      }
+    } catch {
+      errDetail = await analyzeRes.text();
+    }
+    throw new Error(`Analysis failed (HTTP ${analyzeRes.status}): ${errDetail}`);
   }
 
   const result = await analyzeRes.json();
