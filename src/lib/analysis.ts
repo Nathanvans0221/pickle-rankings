@@ -1,6 +1,7 @@
 import { upload } from '@vercel/blob/client';
 import type { MatchAnalysis, MatchPlayer } from '../types';
-import { getPlayer, getPlayers, savePlayers } from './storage';
+import { getPlayer, getPlayers, savePlayers, addCorrection, getPlayerCorrectionSummary, updatePlayer } from './storage';
+import { v4 as uuidv4 } from 'uuid';
 import { apiUrl } from './config';
 
 const ANALYSIS_SYSTEM_PROMPT = `You are an elite pickleball analyst and certified coach. You are watching a FULL pickleball game video — not screenshots, the actual gameplay footage.
@@ -44,6 +45,9 @@ Your job is to evaluate each player's skill level using the official USA Pickleb
 - Don't inflate ratings — a true 4.0 is quite good recreationally.
 - The gap between 3.5 and 4.0 is the biggest skill jump in recreational play.
 - Consistency is MORE important than occasional great shots.
+
+## Correction History Context
+Some players may include "Correction History" data showing how the user has corrected your ratings in previous analyses. This correction history is GROUND TRUTH — it reflects the human's direct assessment after watching the same footage. If a player has a correction history showing the AI consistently underrates or overrates them, you MUST weight your assessment accordingly. For example, if correction history shows "avg +0.7 UPWARD", your initial rating instinct for that player is likely ~0.7 too low — adjust upward proactively.
 
 Respond with a JSON object matching this structure exactly:
 {
@@ -176,7 +180,12 @@ export async function analyzeVideoMultiPass(
   const playerContext = players.map(p => {
     const stored = getPlayer(p.player_id);
     const desc = p.appearance ? `, Appearance: ${p.appearance}` : '';
-    return `- ${p.player_name} (ID: ${p.player_id}, Team ${p.team}, Current Rating: ${stored?.current_rating ?? 2.5}${desc})`;
+    let line = `- ${p.player_name} (ID: ${p.player_id}, Team ${p.team}, Current Rating: ${stored?.current_rating ?? 2.5}${desc})`;
+    const summary = getPlayerCorrectionSummary(p.player_id);
+    if (summary) {
+      line += ` | Correction History: In ${summary.correction_count} prior analyses, user corrected by avg ${summary.avg_adjustment > 0 ? '+' : ''}${summary.avg_adjustment}. AI avg: ${summary.avg_ai_rating}, corrected avg: ${summary.avg_corrected_rating}. Bias: ${summary.direction === 'up' ? 'UPWARD' : summary.direction === 'down' ? 'DOWNWARD' : 'NEUTRAL'}. Weight accordingly.`;
+    }
+    return line;
   }).join('\n');
 
   // Phase 1: Structure Scan
@@ -294,7 +303,12 @@ export async function analyzeVideo(
   const playerContext = players.map(p => {
     const stored = getPlayer(p.player_id);
     const desc = p.appearance ? `, Appearance: ${p.appearance}` : '';
-    return `- ${p.player_name} (ID: ${p.player_id}, Team ${p.team}, Current Rating: ${stored?.current_rating ?? 2.5}${desc})`;
+    let line = `- ${p.player_name} (ID: ${p.player_id}, Team ${p.team}, Current Rating: ${stored?.current_rating ?? 2.5}${desc})`;
+    const summary = getPlayerCorrectionSummary(p.player_id);
+    if (summary) {
+      line += ` | Correction History: In ${summary.correction_count} prior analyses, user corrected by avg ${summary.avg_adjustment > 0 ? '+' : ''}${summary.avg_adjustment}. AI avg: ${summary.avg_ai_rating}, corrected avg: ${summary.avg_corrected_rating}. Bias: ${summary.direction === 'up' ? 'UPWARD' : summary.direction === 'down' ? 'DOWNWARD' : 'NEUTRAL'}. Weight accordingly.`;
+    }
+    return line;
   }).join('\n');
 
   let blobUrl: string;
@@ -411,6 +425,42 @@ export function reverseRatingUpdates(analysis: MatchAnalysis, matchId: string) {
   }
 
   savePlayers(players);
+}
+
+export function applyRatingCorrection(
+  matchId: string,
+  playerId: string,
+  playerName: string,
+  aiRating: number,
+  correctedRating: number,
+  note?: string,
+) {
+  const clamped = Math.max(2.0, Math.min(5.5, correctedRating));
+
+  addCorrection({
+    id: uuidv4(),
+    match_id: matchId,
+    player_id: playerId,
+    player_name: playerName,
+    ai_rating: aiRating,
+    corrected_rating: clamped,
+    note,
+    created_at: new Date().toISOString(),
+  });
+
+  // Update player's current rating
+  updatePlayer(playerId, { current_rating: clamped });
+
+  // Patch the matching rating_history entry for this match
+  const player = getPlayer(playerId);
+  if (player) {
+    const history = [...player.rating_history];
+    const histIdx = history.findIndex(e => e.match_id === matchId);
+    if (histIdx >= 0) {
+      history[histIdx] = { ...history[histIdx], rating: clamped };
+      updatePlayer(playerId, { rating_history: history });
+    }
+  }
 }
 
 export { ANALYSIS_SYSTEM_PROMPT };

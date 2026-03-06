@@ -13,6 +13,9 @@ For EACH player's rating in the draft:
 
 After your review, output the FINAL analysis JSON (same structure as the draft, with any adjusted ratings) AND a separate calibration_notes field explaining your reasoning.
 
+## Correction History Signals
+If the player context in the draft includes "Correction History" data, treat these as strong signals. The correction history represents ground truth from the user who watched the same footage. If the AI has been consistently corrected upward or downward for a player, lean toward the established correction pattern when calibrating.
+
 ## Important
 - Do NOT inflate ratings. Most recreational players are 2.5-4.0.
 - Preserve the existing JSON structure exactly.

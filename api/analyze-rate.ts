@@ -45,6 +45,9 @@ Your job is to evaluate each player's skill level using the official USA Pickleb
 - The gap between 3.5 and 4.0 is the biggest skill jump in recreational play.
 - Consistency is MORE important than occasional great shots.
 
+## Correction History Context
+Some players may include "Correction History" data showing how the user has corrected your ratings in previous analyses. This correction history is GROUND TRUTH — it reflects the human's direct assessment after watching the same footage. If a player has a correction history showing the AI consistently underrates or overrates them, you MUST weight your assessment accordingly. For example, if correction history shows "avg +0.7 UPWARD", your initial rating instinct for that player is likely ~0.7 too low — adjust upward proactively.
+
 Respond with a JSON object matching this structure exactly:
 {
   "summary": "Brief 2-3 sentence overview of the match including style of play and competitiveness",

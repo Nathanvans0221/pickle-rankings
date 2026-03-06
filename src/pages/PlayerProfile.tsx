@@ -1,7 +1,7 @@
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, TrendingUp, Target, Zap, Shield } from 'lucide-react';
+import { ArrowLeft, TrendingUp, Target, Zap, Shield, SlidersHorizontal } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { getPlayer, getMatches } from '../lib/storage';
+import { getPlayer, getMatches, getPlayerCorrectionSummary } from '../lib/storage';
 import { RatingBadge } from '../components/RatingBadge';
 import { PlayerAvatar } from '../components/PlayerAvatar';
 import { SkillBar } from '../components/SkillBar';
@@ -29,6 +29,7 @@ export function PlayerProfilePage() {
     .flatMap(m => m.analysis!.player_analyses.filter(pa => pa.player_id === id));
 
   const latestAnalysis = playerAnalyses[playerAnalyses.length - 1];
+  const correctionSummary = id ? getPlayerCorrectionSummary(id) : null;
 
   const chartData = player.rating_history.map((entry, i) => ({
     game: i + 1,
@@ -160,6 +161,23 @@ export function PlayerProfilePage() {
           </div>
         )}
       </div>
+
+      {/* Correction Summary */}
+      {correctionSummary && (
+        <div className="mt-6 bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+          <h2 className="font-semibold text-zinc-200 mb-3 flex items-center gap-2">
+            <SlidersHorizontal size={18} className="text-pickle" /> Rating Corrections
+          </h2>
+          <div className="space-y-2 text-sm">
+            <p className="text-zinc-400">
+              AI tends to rate <span className="text-zinc-200 font-medium">{correctionSummary.avg_ai_rating.toFixed(1)}</span> — you've corrected to avg <span className="text-zinc-200 font-medium">{correctionSummary.avg_corrected_rating.toFixed(1)}</span> across <span className="text-zinc-200 font-medium">{correctionSummary.correction_count}</span> correction{correctionSummary.correction_count !== 1 ? 's' : ''}
+            </p>
+            <p className={`text-sm font-medium ${correctionSummary.direction === 'up' ? 'text-green-400' : correctionSummary.direction === 'down' ? 'text-red-400' : 'text-zinc-500'}`}>
+              Avg adjustment: {correctionSummary.avg_adjustment > 0 ? '+' : ''}{correctionSummary.avg_adjustment.toFixed(1)} (AI {correctionSummary.direction === 'up' ? 'underrates' : correctionSummary.direction === 'down' ? 'overrates' : 'rates accurately'} this player)
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Match History */}
       {matches.length > 0 && (

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Download, Trash2, Info } from 'lucide-react';
 import { useTheme, type ThemePreference } from '../hooks/useTheme';
-import { getPlayers, getMatches, getClaimedPlayerId, setClaimedPlayerId } from '../lib/storage';
+import { getPlayers, getMatches, getClaimedPlayerId, setClaimedPlayerId, getCorrections } from '../lib/storage';
 import { PlayerAvatar } from '../components/PlayerAvatar';
 import { RatingBadge } from '../components/RatingBadge';
 
@@ -23,6 +23,7 @@ export function SettingsPage() {
     const data = {
       players: getPlayers(),
       matches: getMatches(),
+      corrections: getCorrections(),
       exportedAt: new Date().toISOString(),
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -38,6 +39,7 @@ export function SettingsPage() {
     localStorage.removeItem('pickle_rankings_players');
     localStorage.removeItem('pickle_rankings_matches');
     localStorage.removeItem('pickle_rankings_claimed_player');
+    localStorage.removeItem('pickle_rankings_corrections');
     setConfirmClear(false);
     window.location.reload();
   };

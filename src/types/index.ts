@@ -111,6 +111,25 @@ export const SKILL_LEVELS: SkillLevel[] = [
   { min: 5.5, max: 6.0, label: '5.5+ - Pro', description: 'Dominance-level execution, tournament-caliber consistency', color: '#ec4899' },
 ];
 
+export interface RatingCorrection {
+  id: string;
+  match_id: string;
+  player_id: string;
+  player_name: string;
+  ai_rating: number;
+  corrected_rating: number;
+  note?: string;
+  created_at: string;
+}
+
+export interface PlayerCorrectionSummary {
+  correction_count: number;
+  avg_ai_rating: number;
+  avg_corrected_rating: number;
+  avg_adjustment: number;
+  direction: 'up' | 'down' | 'neutral';
+}
+
 export function getSkillLevel(rating: number): SkillLevel {
   return SKILL_LEVELS.find(l => rating >= l.min && rating <= l.max) ?? SKILL_LEVELS[0];
 }

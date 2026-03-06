@@ -1,8 +1,8 @@
 import { useState, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Target, TrendingUp, TrendingDown, RefreshCw, Loader2, Trash2 } from 'lucide-react';
-import { getMatch, updateMatch, deleteMatch } from '../lib/storage';
-import { analyzeVideo, applyRatingUpdates, reverseRatingUpdates } from '../lib/analysis';
+import { ArrowLeft, Target, TrendingUp, TrendingDown, RefreshCw, Loader2, Trash2, SlidersHorizontal, X, Minus, Plus, Check } from 'lucide-react';
+import { getMatch, updateMatch, deleteMatch, getMatchCorrections } from '../lib/storage';
+import { analyzeVideo, applyRatingUpdates, reverseRatingUpdates, applyRatingCorrection } from '../lib/analysis';
 import { RatingBadge } from '../components/RatingBadge';
 import { PlayerAvatar } from '../components/PlayerAvatar';
 import { SkillBar } from '../components/SkillBar';
@@ -62,7 +62,42 @@ export function MatchDetailPage() {
   const [reanalyzing, setReanalyzing] = useState(false);
   const [reanalyzeProgress, setReanalyzeProgress] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showCorrectionModal, setShowCorrectionModal] = useState(false);
+  const [correctionValues, setCorrectionValues] = useState<Record<string, { rating: number; note: string }>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const existingCorrections = id ? getMatchCorrections(id) : [];
+
+  const openCorrectionModal = useCallback(() => {
+    if (!matchData?.analysis) return;
+    const initial: Record<string, { rating: number; note: string }> = {};
+    for (const pa of matchData.analysis.player_analyses) {
+      const existing = existingCorrections.find(c => c.player_id === pa.player_id);
+      initial[pa.player_id] = {
+        rating: existing?.corrected_rating ?? pa.rating_after,
+        note: existing?.note ?? '',
+      };
+    }
+    setCorrectionValues(initial);
+    setShowCorrectionModal(true);
+  }, [matchData, existingCorrections]);
+
+  const handleSaveCorrections = useCallback(() => {
+    if (!matchData?.analysis || !id) return;
+    let changed = 0;
+    for (const pa of matchData.analysis.player_analyses) {
+      const val = correctionValues[pa.player_id];
+      if (!val) continue;
+      const aiRating = pa.rating_after;
+      if (Math.abs(val.rating - aiRating) < 0.05) continue;
+      applyRatingCorrection(id, pa.player_id, pa.player_name, aiRating, val.rating, val.note || undefined);
+      changed++;
+    }
+    if (changed > 0) {
+      setMatchData(getMatch(id));
+    }
+    setShowCorrectionModal(false);
+  }, [matchData, id, correctionValues]);
 
   const handleDelete = useCallback(() => {
     if (!matchData || !id) return;
@@ -146,6 +181,16 @@ export function MatchDetailPage() {
         </div>
       )}
 
+      {/* Corrections Banner */}
+      {existingCorrections.length > 0 && (
+        <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 mb-6 flex items-center gap-3">
+          <Check size={18} className="text-green-400 shrink-0" />
+          <p className="text-sm text-green-300">
+            Ratings manually corrected for {existingCorrections.length} player{existingCorrections.length !== 1 ? 's' : ''}
+          </p>
+        </div>
+      )}
+
       {/* Match Header */}
       <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5 sm:p-6 mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
@@ -162,13 +207,25 @@ export function MatchDetailPage() {
             {!reanalyzing && !confirmDelete && (
               <>
                 {match.status === 'complete' && (
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] bg-zinc-800 text-zinc-300 rounded-xl text-sm font-medium hover:bg-zinc-700 transition-colors cursor-pointer border-0"
-                  >
-                    <RefreshCw size={16} />
-                    Re-analyze
-                  </button>
+                  <>
+                    <button
+                      onClick={openCorrectionModal}
+                      className="relative flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] bg-zinc-800 text-zinc-300 rounded-xl text-sm font-medium hover:bg-zinc-700 transition-colors cursor-pointer border-0"
+                    >
+                      <SlidersHorizontal size={16} />
+                      Adjust Ratings
+                      {existingCorrections.length > 0 && (
+                        <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] bg-zinc-800 text-zinc-300 rounded-xl text-sm font-medium hover:bg-zinc-700 transition-colors cursor-pointer border-0"
+                    >
+                      <RefreshCw size={16} />
+                      Re-analyze
+                    </button>
+                  </>
                 )}
                 <button
                   onClick={() => setConfirmDelete(true)}
@@ -267,6 +324,96 @@ export function MatchDetailPage() {
               </div>
             )}
           </div>
+
+          {/* Rating Correction Modal */}
+          {showCorrectionModal && (
+            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+              <div className="absolute inset-0 bg-black/60" onClick={() => setShowCorrectionModal(false)} />
+              <div className="relative bg-zinc-900 border border-zinc-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[85vh] overflow-y-auto">
+                <div className="sticky top-0 bg-zinc-900 border-b border-zinc-800 px-5 py-4 flex items-center justify-between z-10">
+                  <h3 className="font-semibold text-zinc-200">Adjust Ratings</h3>
+                  <button onClick={() => setShowCorrectionModal(false)} className="p-2 text-zinc-400 hover:text-zinc-200 bg-transparent border-0 cursor-pointer">
+                    <X size={20} />
+                  </button>
+                </div>
+                <div className="p-5 space-y-5">
+                  {analysis.player_analyses.map(pa => {
+                    const val = correctionValues[pa.player_id];
+                    if (!val) return null;
+                    const delta = val.rating - pa.rating_after;
+                    const hasChanged = Math.abs(delta) >= 0.05;
+                    return (
+                      <div key={pa.player_id} className={`p-4 rounded-xl border ${hasChanged ? 'border-green-500/30 bg-green-500/5' : 'border-zinc-800 bg-zinc-800/50'}`}>
+                        <div className="flex items-center gap-3 mb-3">
+                          <PlayerAvatar name={pa.player_name} size="sm" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-zinc-200 truncate">{pa.player_name}</p>
+                            <p className="text-xs text-zinc-500">AI rated: {pa.rating_after.toFixed(1)}</p>
+                          </div>
+                          {hasChanged && (
+                            <span className={`text-xs font-medium ${delta > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {delta > 0 ? '+' : ''}{delta.toFixed(1)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => setCorrectionValues(prev => ({
+                              ...prev,
+                              [pa.player_id]: { ...prev[pa.player_id], rating: Math.max(2.0, Math.round((val.rating - 0.1) * 10) / 10) },
+                            }))}
+                            className="w-10 h-10 flex items-center justify-center bg-zinc-700 text-zinc-300 rounded-lg border-0 cursor-pointer hover:bg-zinc-600"
+                          >
+                            <Minus size={16} />
+                          </button>
+                          <input
+                            type="range"
+                            min="2.0"
+                            max="5.5"
+                            step="0.1"
+                            value={val.rating}
+                            onChange={e => setCorrectionValues(prev => ({
+                              ...prev,
+                              [pa.player_id]: { ...prev[pa.player_id], rating: parseFloat(e.target.value) },
+                            }))}
+                            className="flex-1 accent-pickle"
+                          />
+                          <button
+                            onClick={() => setCorrectionValues(prev => ({
+                              ...prev,
+                              [pa.player_id]: { ...prev[pa.player_id], rating: Math.min(5.5, Math.round((val.rating + 0.1) * 10) / 10) },
+                            }))}
+                            className="w-10 h-10 flex items-center justify-center bg-zinc-700 text-zinc-300 rounded-lg border-0 cursor-pointer hover:bg-zinc-600"
+                          >
+                            <Plus size={16} />
+                          </button>
+                          <span className="text-lg font-bold text-zinc-200 w-12 text-center">{val.rating.toFixed(1)}</span>
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="Note (optional)"
+                          value={val.note}
+                          onChange={e => setCorrectionValues(prev => ({
+                            ...prev,
+                            [pa.player_id]: { ...prev[pa.player_id], note: e.target.value },
+                          }))}
+                          className="w-full mt-3 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-pickle"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="sticky bottom-0 bg-zinc-900 border-t border-zinc-800 px-5 py-4">
+                  <button
+                    onClick={handleSaveCorrections}
+                    className="w-full min-h-[44px] bg-pickle text-zinc-950 rounded-xl text-sm font-semibold hover:bg-pickle/90 transition-colors cursor-pointer border-0"
+                  >
+                    Save Corrections
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Per-Player Analysis */}
           <div className="space-y-6">
