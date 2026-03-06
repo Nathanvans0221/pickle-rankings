@@ -6,6 +6,7 @@ import { LeaderboardPage } from './pages/Leaderboard';
 import { PlayersPage } from './pages/Players';
 import { PlayerProfilePage } from './pages/PlayerProfile';
 import { MatchDetailPage } from './pages/MatchDetail';
+import { SettingsPage } from './pages/Settings';
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
           <Route path="/players" element={<PlayersPage />} />
           <Route path="/players/:id" element={<PlayerProfilePage />} />
           <Route path="/matches/:id" element={<MatchDetailPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </Layout>
     </BrowserRouter>

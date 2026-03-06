@@ -30,7 +30,7 @@ function ShotTable({ analysis }: { analysis: PlayerAnalysis }) {
           <th className="text-left text-xs text-zinc-500 py-2">Shot</th>
           <th className="text-center text-xs text-zinc-500 py-2">Count</th>
           <th className="text-center text-xs text-zinc-500 py-2">Quality</th>
-          <th className="text-left text-xs text-zinc-500 py-2">Notes</th>
+          <th className="text-left text-xs text-zinc-500 py-2 hidden sm:table-cell">Notes</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-zinc-800/50">
@@ -47,7 +47,7 @@ function ShotTable({ analysis }: { analysis: PlayerAnalysis }) {
                 {row.quality}/10
               </span>
             </td>
-            <td className="py-2 text-zinc-500 text-xs">{row.notes}</td>
+            <td className="py-2 text-zinc-500 text-xs hidden sm:table-cell">{row.notes}</td>
           </tr>
         ))}
       </tbody>
@@ -66,7 +66,6 @@ export function MatchDetailPage() {
 
   const handleDelete = useCallback(() => {
     if (!matchData || !id) return;
-    // Reverse rating changes before deleting
     if (matchData.analysis) {
       reverseRatingUpdates(matchData.analysis, id);
     }
@@ -81,19 +80,16 @@ export function MatchDetailPage() {
     setReanalyzeProgress('Uploading video...');
 
     try {
-      // Reverse old rating changes
       if (matchData.analysis) {
         reverseRatingUpdates(matchData.analysis, id);
       }
 
-      // Run new analysis
       const newAnalysis = await analyzeVideo(
         file,
         matchData.players,
         msg => setReanalyzeProgress(msg),
       );
 
-      // Apply new ratings and update match
       applyRatingUpdates(newAnalysis, id);
       updateMatch(id, { status: 'complete', analysis: newAnalysis });
       setMatchData(getMatch(id));
@@ -102,7 +98,6 @@ export function MatchDetailPage() {
     } catch (err: any) {
       setReanalyzeProgress(`Error: ${err.message}`);
       setReanalyzing(false);
-      // Re-apply old ratings if we reversed them
       if (matchData.analysis) {
         applyRatingUpdates(matchData.analysis, id);
       }
@@ -139,8 +134,8 @@ export function MatchDetailPage() {
         onChange={onFileSelected}
       />
 
-      <Link to="/" className="inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-zinc-200 mb-6 no-underline">
-        <ArrowLeft size={16} /> Back to Dashboard
+      <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-zinc-400 hover:text-zinc-200 mb-6 no-underline min-h-[44px] px-1">
+        <ArrowLeft size={18} /> Back to Dashboard
       </Link>
 
       {/* Re-analyze Banner */}
@@ -152,10 +147,10 @@ export function MatchDetailPage() {
       )}
 
       {/* Match Header */}
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-bold">{match.video_name}</h1>
+      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5 sm:p-6 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold truncate">{match.video_name}</h1>
             <p className="text-sm text-zinc-400 mt-1">
               {new Date(match.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
               {analysis?.analysis_mode && (
@@ -163,23 +158,23 @@ export function MatchDetailPage() {
               )}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {!reanalyzing && !confirmDelete && (
               <>
                 {match.status === 'complete' && (
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 text-zinc-300 rounded-lg text-xs font-medium hover:bg-zinc-700 transition-colors cursor-pointer border-0"
+                    className="flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] bg-zinc-800 text-zinc-300 rounded-xl text-sm font-medium hover:bg-zinc-700 transition-colors cursor-pointer border-0"
                   >
-                    <RefreshCw size={14} />
+                    <RefreshCw size={16} />
                     Re-analyze
                   </button>
                 )}
                 <button
                   onClick={() => setConfirmDelete(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 text-zinc-300 rounded-lg text-xs font-medium hover:bg-red-500/20 hover:text-red-400 transition-colors cursor-pointer border-0"
+                  className="flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] bg-zinc-800 text-zinc-300 rounded-xl text-sm font-medium hover:bg-red-500/20 hover:text-red-400 transition-colors cursor-pointer border-0"
                 >
-                  <Trash2 size={14} />
+                  <Trash2 size={16} />
                   Delete
                 </button>
               </>
@@ -189,13 +184,13 @@ export function MatchDetailPage() {
                 <span className="text-xs text-zinc-400">Delete this match?</span>
                 <button
                   onClick={handleDelete}
-                  className="px-3 py-1.5 bg-red-500/20 text-red-400 rounded-lg text-xs font-medium hover:bg-red-500/30 transition-colors cursor-pointer border-0"
+                  className="px-4 py-2.5 min-h-[44px] bg-red-500/20 text-red-400 rounded-xl text-sm font-medium hover:bg-red-500/30 transition-colors cursor-pointer border-0"
                 >
                   Yes, delete
                 </button>
                 <button
                   onClick={() => setConfirmDelete(false)}
-                  className="px-3 py-1.5 bg-zinc-800 text-zinc-300 rounded-lg text-xs font-medium hover:bg-zinc-700 transition-colors cursor-pointer border-0"
+                  className="px-4 py-2.5 min-h-[44px] bg-zinc-800 text-zinc-300 rounded-xl text-sm font-medium hover:bg-zinc-700 transition-colors cursor-pointer border-0"
                 >
                   Cancel
                 </button>
@@ -211,13 +206,13 @@ export function MatchDetailPage() {
           </div>
         </div>
 
-        {/* Score & Teams */}
-        <div className="flex items-center justify-center gap-8 py-4">
+        {/* Score & Teams — vertical stack on mobile */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 py-4">
           <div className="text-center">
             <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Team 1</p>
             <div className="flex items-center gap-2">
               {team1.map(p => (
-                <Link key={p.player_id} to={`/players/${p.player_id}`} className="flex items-center gap-1.5 no-underline">
+                <Link key={p.player_id} to={`/players/${p.player_id}`} className="flex items-center gap-1.5 no-underline min-h-[44px]">
                   <PlayerAvatar name={p.player_name} size="sm" />
                   <span className="text-sm text-zinc-300">{p.player_name}</span>
                 </Link>
@@ -233,7 +228,7 @@ export function MatchDetailPage() {
             <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Team 2</p>
             <div className="flex items-center gap-2">
               {team2.map(p => (
-                <Link key={p.player_id} to={`/players/${p.player_id}`} className="flex items-center gap-1.5 no-underline">
+                <Link key={p.player_id} to={`/players/${p.player_id}`} className="flex items-center gap-1.5 no-underline min-h-[44px]">
                   <PlayerAvatar name={p.player_name} size="sm" />
                   <span className="text-sm text-zinc-300">{p.player_name}</span>
                 </Link>
@@ -278,7 +273,7 @@ export function MatchDetailPage() {
             {analysis.player_analyses.map(pa => (
               <div key={pa.player_id} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
                 <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
-                  <Link to={`/players/${pa.player_id}`} className="flex items-center gap-3 no-underline">
+                  <Link to={`/players/${pa.player_id}`} className="flex items-center gap-3 no-underline min-h-[44px]">
                     <PlayerAvatar name={pa.player_name} size="md" />
                     <div>
                       <p className="font-semibold text-zinc-200">{pa.player_name}</p>
@@ -323,7 +318,7 @@ export function MatchDetailPage() {
                 </div>
 
                 {/* Strengths & Improvements */}
-                <div className="grid grid-cols-2 divide-x divide-zinc-800 border-t border-zinc-800">
+                <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-zinc-800 border-t border-zinc-800">
                   <div className="p-4">
                     <p className="text-xs font-medium text-green-400 mb-2">Strengths</p>
                     <ul className="space-y-1">

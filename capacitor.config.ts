@@ -10,6 +10,12 @@ const config: CapacitorConfig = {
   ios: {
     backgroundColor: '#09090b',
   },
+  plugins: {
+    LocalNotifications: {
+      smallIcon: 'ic_stat_icon',
+      iconColor: '#4ade80',
+    },
+  },
 };
 
 export default config;

@@ -3,6 +3,19 @@ import { v4 as uuidv4 } from 'uuid';
 
 const PLAYERS_KEY = 'pickle_rankings_players';
 const MATCHES_KEY = 'pickle_rankings_matches';
+const CLAIMED_PLAYER_KEY = 'pickle_rankings_claimed_player';
+
+export function getClaimedPlayerId(): string | null {
+  return localStorage.getItem(CLAIMED_PLAYER_KEY);
+}
+
+export function setClaimedPlayerId(id: string | null) {
+  if (id) {
+    localStorage.setItem(CLAIMED_PLAYER_KEY, id);
+  } else {
+    localStorage.removeItem(CLAIMED_PLAYER_KEY);
+  }
+}
 
 export function getPlayers(): Player[] {
   const data = localStorage.getItem(PLAYERS_KEY);

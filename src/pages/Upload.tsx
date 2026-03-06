@@ -71,7 +71,6 @@ export function UploadPage() {
       setIdentifiedPlayers(result.players);
       setBlobUrl(result.blobUrl);
       setGeminiFileUri(result.geminiFileUri);
-      // Pre-fill name inputs as empty
       const names: Record<number, string> = {};
       result.players.forEach((_, i) => { names[i] = ''; });
       setPlayerNames(names);
@@ -87,7 +86,6 @@ export function UploadPage() {
     identifiedPlayers.forEach((ip, i) => {
       const name = playerNames[i]?.trim();
       if (!name) return;
-      // Find or create the player
       let existing = existingPlayers.find(p => p.name.toLowerCase() === name.toLowerCase());
       if (!existing) {
         existing = addPlayer(name);
@@ -166,7 +164,6 @@ export function UploadPage() {
 
       let analysis;
       if (geminiFileUri) {
-        // Use multi-pass pipeline (video already uploaded to Gemini)
         analysis = await analyzeVideoMultiPass(
           matchPlayers,
           geminiFileUri,
@@ -177,7 +174,6 @@ export function UploadPage() {
           },
         );
       } else {
-        // Fallback to single-pass (no Gemini URI available)
         analysis = await analyzeVideo(
           videoFile,
           matchPlayers,
@@ -209,24 +205,24 @@ export function UploadPage() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <h1 className="text-3xl font-bold mb-2">Analyze Game</h1>
-      <p className="text-zinc-400 text-sm mb-8">Upload a pickleball game video — Gemini AI watches the full game</p>
+      <h1 className="text-2xl font-bold mb-2">Analyze Game</h1>
+      <p className="text-zinc-400 text-sm mb-6">Upload a pickleball game video — Gemini AI watches the full game</p>
 
       {/* Step 1: Upload */}
       {step === 'upload' && (
         <div
           {...getRootProps()}
-          className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-colors ${
+          className={`border-2 border-dashed rounded-2xl p-10 sm:p-16 text-center cursor-pointer transition-colors ${
             isDragActive ? 'border-pickle bg-pickle/5' : 'border-zinc-700 hover:border-zinc-500'
           }`}
         >
           <input {...getInputProps()} />
-          <Film size={48} className="text-zinc-500 mx-auto mb-4" />
+          <Film size={56} className="text-zinc-500 mx-auto mb-4" />
           <p className="text-lg font-medium text-zinc-300">Drop your game video here</p>
-          <p className="text-sm text-zinc-500 mt-1">or click to browse &middot; MP4, MOV, AVI, WebM up to 5GB</p>
+          <p className="text-sm text-zinc-500 mt-1">or tap to browse &middot; MP4, MOV, AVI, WebM up to 5GB</p>
           <p className="text-xs text-zinc-600 mt-3">Powered by Gemini 2.5 Pro — watches your entire game, not just screenshots</p>
           {error && (
-            <div className="mt-4 px-4 py-2 bg-red-500/10 border border-red-500/30 rounded-lg">
+            <div className="mt-4 px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-xl">
               <p className="text-sm text-red-400">{error}</p>
             </div>
           )}
@@ -235,12 +231,12 @@ export function UploadPage() {
 
       {/* Step 2: Identifying Players */}
       {step === 'identifying' && (
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-8 text-center">
-          <Loader2 size={40} className="text-pickle mx-auto mb-4 animate-spin" />
+        <div className="bg-zinc-900 rounded-2xl border border-zinc-800 p-8 text-center">
+          <Loader2 size={44} className="text-pickle mx-auto mb-4 animate-spin" />
           <h2 className="text-xl font-semibold text-zinc-200 mb-2">Scanning for Players</h2>
           <p className="text-sm text-zinc-400 mb-2">{progress}</p>
           <p className="text-xs text-zinc-600 mb-6">AI is watching the video to identify each player by appearance</p>
-          <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden max-w-md mx-auto">
+          <div className="w-full h-3 bg-zinc-800 rounded-full overflow-hidden max-w-md mx-auto">
             <div
               className="h-full bg-pickle rounded-full transition-all duration-500"
               style={{ width: `${progressPct}%` }}
@@ -254,23 +250,23 @@ export function UploadPage() {
       {step === 'assign' && (
         <div>
           {videoPreviewUrl && (
-            <div className="mb-6 rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+            <div className="mb-6 rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800">
               <video src={videoPreviewUrl} controls className="w-full max-h-48 object-contain bg-black" />
             </div>
           )}
 
-          <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5 mb-6">
+          <div className="bg-zinc-900 rounded-2xl border border-zinc-800 p-5 mb-6">
             <div className="flex items-center gap-2 mb-4">
-              <Eye size={20} className="text-pickle" />
+              <Eye size={22} className="text-pickle" />
               <h3 className="font-semibold text-zinc-200">AI Detected {identifiedPlayers.length} Players</h3>
             </div>
             <p className="text-sm text-zinc-400 mb-5">Assign a name to each player the AI found. Leave blank to skip a player.</p>
 
             <div className="space-y-4">
               {identifiedPlayers.map((ip, i) => (
-                <div key={i} className="bg-zinc-800 rounded-lg p-4">
+                <div key={i} className="bg-zinc-800 rounded-xl p-4">
                   <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-pickle/20 text-pickle flex items-center justify-center font-bold text-sm">
+                    <div className="flex-shrink-0 w-11 h-11 rounded-full bg-pickle/20 text-pickle flex items-center justify-center font-bold text-sm">
                       {String.fromCharCode(65 + i)}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -284,14 +280,13 @@ export function UploadPage() {
                           onChange={e => setPlayerNames(prev => ({ ...prev, [i]: e.target.value }))}
                           onKeyDown={e => {
                             if (e.key === 'Enter') {
-                              // Focus next input
                               const next = document.querySelector<HTMLInputElement>(`[data-player-idx="${i + 1}"]`);
                               next?.focus();
                             }
                           }}
                           data-player-idx={i}
                           list={`existing-players-${i}`}
-                          className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-pickle text-sm"
+                          className="flex-1 px-4 py-3 bg-zinc-900 border border-zinc-700 rounded-xl text-base text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-pickle"
                         />
                         <datalist id={`existing-players-${i}`}>
                           {existingPlayers.map(p => (
@@ -306,18 +301,18 @@ export function UploadPage() {
             </div>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             <button
               onClick={confirmAssignments}
               disabled={assignedCount < 2}
-              className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-pickle text-zinc-950 rounded-xl text-base font-semibold hover:bg-pickle-dark disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors border-0"
+              className="flex-1 flex items-center justify-center gap-2 px-6 py-3.5 min-h-[48px] bg-pickle text-zinc-950 rounded-xl text-base font-semibold hover:bg-pickle-dark disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors border-0"
             >
-              <UserPlus size={20} />
+              <UserPlus size={22} />
               Confirm {assignedCount} Players
             </button>
             <button
               onClick={skipIdentification}
-              className="px-4 py-3 bg-zinc-800 text-zinc-400 rounded-xl text-sm font-medium hover:bg-zinc-700 hover:text-zinc-300 cursor-pointer transition-colors border-0"
+              className="px-5 py-3.5 min-h-[48px] bg-zinc-800 text-zinc-400 rounded-xl text-sm font-medium hover:bg-zinc-700 hover:text-zinc-300 cursor-pointer transition-colors border-0"
             >
               Skip — Add Manually
             </button>
@@ -332,16 +327,16 @@ export function UploadPage() {
       {step === 'players' && (
         <div>
           {videoPreviewUrl && (
-            <div className="mb-6 rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+            <div className="mb-6 rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800">
               <video src={videoPreviewUrl} controls className="w-full max-h-64 object-contain bg-black" />
-              <div className="px-4 py-2 border-t border-zinc-800">
+              <div className="px-4 py-2.5 border-t border-zinc-800">
                 <p className="text-sm text-zinc-400">{videoFile?.name} &middot; {videoFile ? (videoFile.size / (1024 * 1024)).toFixed(0) : 0}MB</p>
               </div>
             </div>
           )}
 
           {/* Score Input */}
-          <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5 mb-6">
+          <div className="bg-zinc-900 rounded-2xl border border-zinc-800 p-5 mb-6">
             <h3 className="font-semibold text-zinc-200 mb-3">Score (optional)</h3>
             <div className="flex items-center gap-4">
               <div className="flex-1">
@@ -351,7 +346,7 @@ export function UploadPage() {
                   value={team1Score}
                   onChange={e => setTeam1Score(e.target.value)}
                   placeholder="—"
-                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-200 text-center text-lg font-semibold placeholder-zinc-600 focus:outline-none focus:border-pickle"
+                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-base text-zinc-200 text-center font-semibold placeholder-zinc-600 focus:outline-none focus:border-pickle"
                 />
               </div>
               <span className="text-zinc-500 font-bold mt-5">vs</span>
@@ -362,34 +357,34 @@ export function UploadPage() {
                   value={team2Score}
                   onChange={e => setTeam2Score(e.target.value)}
                   placeholder="—"
-                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-200 text-center text-lg font-semibold placeholder-zinc-600 focus:outline-none focus:border-pickle"
+                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-base text-zinc-200 text-center font-semibold placeholder-zinc-600 focus:outline-none focus:border-pickle"
                 />
               </div>
             </div>
           </div>
 
           {/* Player Selection */}
-          <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5 mb-6">
+          <div className="bg-zinc-900 rounded-2xl border border-zinc-800 p-5 mb-6">
             <h3 className="font-semibold text-zinc-200 mb-3">Players</h3>
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
                 <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Team 1</p>
                 <div className="space-y-2">
                   {matchPlayers.filter(p => p.team === 1).map(p => (
-                    <div key={p.player_id} className="px-3 py-2 bg-zinc-800 rounded-lg">
+                    <div key={p.player_id} className="px-3 py-2.5 bg-zinc-800 rounded-xl">
                       <div className="flex items-center gap-2">
                         <PlayerAvatar name={p.player_name} size="sm" />
                         <span className="text-sm text-zinc-200 flex-1">{p.player_name}</span>
-                        <button onClick={() => toggleTeam(p.player_id)} className="text-xs text-zinc-500 hover:text-pickle bg-transparent border-0 cursor-pointer">swap</button>
-                        <button onClick={() => removePlayer(p.player_id)} className="text-xs text-zinc-500 hover:text-red-400 bg-transparent border-0 cursor-pointer">&times;</button>
+                        <button onClick={() => toggleTeam(p.player_id)} className="min-h-[44px] min-w-[44px] flex items-center justify-center text-xs text-zinc-500 hover:text-pickle bg-transparent border-0 cursor-pointer">swap</button>
+                        <button onClick={() => removePlayer(p.player_id)} className="min-h-[44px] min-w-[44px] flex items-center justify-center text-lg text-zinc-500 hover:text-red-400 bg-transparent border-0 cursor-pointer">&times;</button>
                       </div>
                       <input
                         type="text"
                         placeholder="Appearance: e.g. blue hat, white shirt"
                         value={p.appearance || ''}
                         onChange={e => updateAppearance(p.player_id, e.target.value)}
-                        className="w-full mt-1.5 px-2 py-1 bg-zinc-900 border border-zinc-700 rounded text-xs text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-pickle"
+                        className="w-full mt-1.5 px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-pickle"
                       />
                     </div>
                   ))}
@@ -399,19 +394,19 @@ export function UploadPage() {
                 <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Team 2</p>
                 <div className="space-y-2">
                   {matchPlayers.filter(p => p.team === 2).map(p => (
-                    <div key={p.player_id} className="px-3 py-2 bg-zinc-800 rounded-lg">
+                    <div key={p.player_id} className="px-3 py-2.5 bg-zinc-800 rounded-xl">
                       <div className="flex items-center gap-2">
                         <PlayerAvatar name={p.player_name} size="sm" />
                         <span className="text-sm text-zinc-200 flex-1">{p.player_name}</span>
-                        <button onClick={() => toggleTeam(p.player_id)} className="text-xs text-zinc-500 hover:text-pickle bg-transparent border-0 cursor-pointer">swap</button>
-                        <button onClick={() => removePlayer(p.player_id)} className="text-xs text-zinc-500 hover:text-red-400 bg-transparent border-0 cursor-pointer">&times;</button>
+                        <button onClick={() => toggleTeam(p.player_id)} className="min-h-[44px] min-w-[44px] flex items-center justify-center text-xs text-zinc-500 hover:text-pickle bg-transparent border-0 cursor-pointer">swap</button>
+                        <button onClick={() => removePlayer(p.player_id)} className="min-h-[44px] min-w-[44px] flex items-center justify-center text-lg text-zinc-500 hover:text-red-400 bg-transparent border-0 cursor-pointer">&times;</button>
                       </div>
                       <input
                         type="text"
                         placeholder="Appearance: e.g. red shorts, tall"
                         value={p.appearance || ''}
                         onChange={e => updateAppearance(p.player_id, e.target.value)}
-                        className="w-full mt-1.5 px-2 py-1 bg-zinc-900 border border-zinc-700 rounded text-xs text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-pickle"
+                        className="w-full mt-1.5 px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-xs text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-pickle"
                       />
                     </div>
                   ))}
@@ -430,7 +425,7 @@ export function UploadPage() {
                       <button
                         key={p.id}
                         onClick={() => addExistingPlayer(p.id, p.name)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm text-zinc-300 transition-colors cursor-pointer border-0"
+                        className="flex items-center gap-1.5 px-3 py-2 min-h-[44px] bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm text-zinc-300 transition-colors cursor-pointer border-0"
                       >
                         <PlayerAvatar name={p.name} size="sm" />
                         {p.name}
@@ -448,12 +443,12 @@ export function UploadPage() {
                 value={newPlayerName}
                 onChange={e => setNewPlayerName(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && addNewPlayer()}
-                className="flex-1 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-pickle text-sm"
+                className="flex-1 px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-base text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-pickle"
               />
               <button
                 onClick={addNewPlayer}
                 disabled={!newPlayerName.trim()}
-                className="px-3 py-2 bg-zinc-700 text-zinc-300 rounded-lg text-sm hover:bg-zinc-600 disabled:opacity-40 cursor-pointer border-0"
+                className="px-4 py-3 min-h-[44px] bg-zinc-700 text-zinc-300 rounded-xl text-sm hover:bg-zinc-600 disabled:opacity-40 cursor-pointer border-0"
               >
                 Add
               </button>
@@ -464,9 +459,9 @@ export function UploadPage() {
           <button
             onClick={startAnalysis}
             disabled={matchPlayers.length < 2}
-            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-pickle text-zinc-950 rounded-xl text-base font-semibold hover:bg-pickle-dark disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors border-0"
+            className="w-full flex items-center justify-center gap-2 px-6 py-3.5 min-h-[48px] bg-pickle text-zinc-950 rounded-xl text-base font-semibold hover:bg-pickle-dark disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors border-0"
           >
-            <Play size={20} />
+            <Play size={22} />
             Analyze Full Game ({matchPlayers.length} players)
           </button>
           {matchPlayers.length < 2 && (
@@ -477,8 +472,8 @@ export function UploadPage() {
 
       {/* Analyzing */}
       {step === 'analyzing' && (
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-8 text-center">
-          <Loader2 size={40} className="text-pickle mx-auto mb-4 animate-spin" />
+        <div className="bg-zinc-900 rounded-2xl border border-zinc-800 p-8 text-center">
+          <Loader2 size={44} className="text-pickle mx-auto mb-4 animate-spin" />
           <h2 className="text-xl font-semibold text-zinc-200 mb-2">Analyzing Full Game</h2>
           <p className="text-sm text-zinc-400 mb-2">{progress}</p>
           <p className="text-xs text-zinc-600 mb-6">
@@ -488,26 +483,27 @@ export function UploadPage() {
                 ? 'Uploading your video to Google servers...'
                 : 'Gemini + Claude are analyzing every rally — this can take 2-5 minutes for long videos'}
           </p>
-          <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden max-w-md mx-auto">
+          <div className="w-full h-3 bg-zinc-800 rounded-full overflow-hidden max-w-md mx-auto">
             <div
               className="h-full bg-pickle rounded-full transition-all duration-500"
               style={{ width: `${progressPct}%` }}
             />
           </div>
           <p className="text-xs text-zinc-500 mt-2">{progressPct}%</p>
+          <p className="text-xs text-yellow-500/80 mt-4">Keep this screen open for best results.</p>
         </div>
       )}
 
       {/* Done */}
       {step === 'done' && (
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-8 text-center">
-          <CheckCircle size={48} className="text-pickle mx-auto mb-4" />
+        <div className="bg-zinc-900 rounded-2xl border border-zinc-800 p-8 text-center">
+          <CheckCircle size={52} className="text-pickle mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-zinc-200 mb-2">Analysis Complete!</h2>
           <p className="text-sm text-zinc-400 mb-6">Player ratings have been updated</p>
-          <div className="flex justify-center gap-4">
+          <div className="flex flex-col sm:flex-row justify-center gap-3">
             <button
               onClick={() => navigate(`/matches/${matchId}`)}
-              className="px-4 py-2 bg-pickle text-zinc-950 rounded-lg text-sm font-medium hover:bg-pickle-dark cursor-pointer border-0"
+              className="min-h-[44px] px-5 py-3 bg-pickle text-zinc-950 rounded-xl text-sm font-medium hover:bg-pickle-dark cursor-pointer border-0"
             >
               View Results
             </button>
@@ -524,7 +520,7 @@ export function UploadPage() {
                 setTeam1Score('');
                 setTeam2Score('');
               }}
-              className="px-4 py-2 bg-zinc-800 text-zinc-300 rounded-lg text-sm font-medium hover:bg-zinc-700 cursor-pointer border-0"
+              className="min-h-[44px] px-5 py-3 bg-zinc-800 text-zinc-300 rounded-xl text-sm font-medium hover:bg-zinc-700 cursor-pointer border-0"
             >
               Analyze Another
             </button>
@@ -534,16 +530,16 @@ export function UploadPage() {
 
       {/* Error */}
       {step === 'error' && (
-        <div className="bg-zinc-900 rounded-xl border border-red-500/30 p-8 text-center">
-          <AlertCircle size={48} className="text-red-400 mx-auto mb-4" />
+        <div className="bg-zinc-900 rounded-2xl border border-red-500/30 p-8 text-center">
+          <AlertCircle size={52} className="text-red-400 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-zinc-200 mb-2">
             {identifiedPlayers.length === 0 ? 'Player Detection Failed' : 'Analysis Failed'}
           </h2>
           <p className="text-sm text-red-400 mb-6">{error}</p>
-          <div className="flex justify-center gap-3">
+          <div className="flex flex-col sm:flex-row justify-center gap-3">
             <button
               onClick={() => videoFile ? startIdentification(videoFile) : setStep('upload')}
-              className="px-4 py-2 bg-zinc-800 text-zinc-300 rounded-lg text-sm font-medium hover:bg-zinc-700 cursor-pointer border-0"
+              className="min-h-[44px] px-5 py-3 bg-zinc-800 text-zinc-300 rounded-xl text-sm font-medium hover:bg-zinc-700 cursor-pointer border-0"
             >
               Retry
             </button>
@@ -552,7 +548,7 @@ export function UploadPage() {
                 setStep('players');
                 setError('');
               }}
-              className="px-4 py-2 bg-zinc-800 text-zinc-300 rounded-lg text-sm font-medium hover:bg-zinc-700 cursor-pointer border-0"
+              className="min-h-[44px] px-5 py-3 bg-zinc-800 text-zinc-300 rounded-xl text-sm font-medium hover:bg-zinc-700 cursor-pointer border-0"
             >
               Skip — Add Players Manually
             </button>

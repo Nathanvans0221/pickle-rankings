@@ -24,15 +24,12 @@ export function PlayerProfilePage() {
 
   const level = getSkillLevel(player.current_rating);
 
-  // Gather all analyses for this player across matches
   const playerAnalyses: PlayerAnalysis[] = matches
     .filter(m => m.analysis?.player_analyses)
     .flatMap(m => m.analysis!.player_analyses.filter(pa => pa.player_id === id));
 
-  // Latest analysis for skill breakdown
   const latestAnalysis = playerAnalyses[playerAnalyses.length - 1];
 
-  // Rating history chart data
   const chartData = player.rating_history.map((entry, i) => ({
     game: i + 1,
     rating: entry.rating,
@@ -41,38 +38,38 @@ export function PlayerProfilePage() {
 
   return (
     <div>
-      <Link to="/players" className="inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-zinc-200 mb-6 no-underline">
-        <ArrowLeft size={16} /> Back to Players
+      <Link to="/players" className="inline-flex items-center gap-1.5 text-sm text-zinc-400 hover:text-zinc-200 mb-6 no-underline min-h-[44px] px-1">
+        <ArrowLeft size={18} /> Back to Players
       </Link>
 
       {/* Header */}
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6 mb-6">
+      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5 sm:p-6 mb-6">
         <div className="flex items-center gap-4 mb-4">
           <PlayerAvatar name={player.name} avatar_url={player.avatar_url} size="lg" />
-          <div>
-            <h1 className="text-2xl font-bold">{player.name}</h1>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold truncate">{player.name}</h1>
             <p className="text-sm mt-0.5" style={{ color: level.color }}>{level.label}</p>
-            <p className="text-xs text-zinc-500 mt-1">{level.description}</p>
+            <p className="text-xs text-zinc-500 mt-1 hidden sm:block">{level.description}</p>
           </div>
-          <div className="ml-auto text-right">
+          <div className="text-right shrink-0">
             <RatingBadge rating={player.current_rating} size="lg" />
           </div>
         </div>
 
-        <div className="grid grid-cols-4 gap-4 mt-4 pt-4 border-t border-zinc-800">
-          <div className="text-center">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-4 border-t border-zinc-800">
+          <div className="text-center p-2">
             <p className="text-xs text-zinc-500">Games</p>
             <p className="text-xl font-bold">{player.matches_played}</p>
           </div>
-          <div className="text-center">
+          <div className="text-center p-2">
             <p className="text-xs text-zinc-500">Wins</p>
             <p className="text-xl font-bold text-green-400">{player.wins}</p>
           </div>
-          <div className="text-center">
+          <div className="text-center p-2">
             <p className="text-xs text-zinc-500">Losses</p>
             <p className="text-xl font-bold text-red-400">{player.losses}</p>
           </div>
-          <div className="text-center">
+          <div className="text-center p-2">
             <p className="text-xs text-zinc-500">Win Rate</p>
             <p className="text-xl font-bold">
               {player.matches_played > 0 ? Math.round((player.wins / player.matches_played) * 100) : 0}%
@@ -177,7 +174,7 @@ export function PlayerProfilePage() {
                 <Link
                   key={match.id}
                   to={`/matches/${match.id}`}
-                  className="flex items-center gap-3 px-5 py-3 hover:bg-zinc-800/50 transition-colors no-underline"
+                  className="flex items-center gap-3 px-5 py-3.5 hover:bg-zinc-800/50 transition-colors no-underline min-h-[52px]"
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-zinc-300 truncate">{match.video_name}</p>

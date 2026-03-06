@@ -13,7 +13,7 @@ export function SkillBar({ label, value, max = 5.5 }: Props) {
   return (
     <div className="flex items-center gap-3">
       <span className="text-xs text-zinc-400 w-28 shrink-0">{label}</span>
-      <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
+      <div className="flex-1 h-3 bg-zinc-800 rounded-full overflow-hidden">
         <div
           className="h-full rounded-full transition-all duration-500"
           style={{ width: `${pct}%`, backgroundColor: level.color }}

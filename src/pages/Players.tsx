@@ -29,28 +29,28 @@ export function PlayersPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold">Players</h1>
+          <h1 className="text-2xl font-bold">Players</h1>
           <p className="text-zinc-400 text-sm mt-1">Manage your pickleball crew</p>
         </div>
         <button
           onClick={() => setShowAdd(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-pickle text-zinc-950 rounded-lg text-sm font-semibold hover:bg-pickle-dark transition-colors cursor-pointer border-0"
+          className="flex items-center gap-2 px-4 py-2.5 min-h-[44px] bg-pickle text-zinc-950 rounded-xl text-sm font-semibold hover:bg-pickle-dark transition-colors cursor-pointer border-0"
         >
-          <Plus size={16} />
+          <Plus size={18} />
           Add Player
         </button>
       </div>
 
-      {/* Add Player Modal */}
+      {/* Add Player Modal — bottom sheet on mobile */}
       {showAdd && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-zinc-900 rounded-xl border border-zinc-700 p-6 w-full max-w-md mx-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-zinc-900 rounded-t-2xl sm:rounded-2xl border border-zinc-700 p-6 w-full sm:max-w-md sm:mx-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">Add Player</h2>
-              <button onClick={() => setShowAdd(false)} className="text-zinc-400 hover:text-zinc-200 bg-transparent border-0 cursor-pointer">
-                <X size={20} />
+              <button onClick={() => setShowAdd(false)} className="min-h-[44px] min-w-[44px] flex items-center justify-center text-zinc-400 hover:text-zinc-200 bg-transparent border-0 cursor-pointer">
+                <X size={22} />
               </button>
             </div>
             <input
@@ -60,20 +60,20 @@ export function PlayersPage() {
               onChange={e => setNewName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleAdd()}
               autoFocus
-              className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-pickle text-sm"
+              className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-base text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-pickle"
             />
             <p className="text-xs text-zinc-500 mt-2">New players start at a 2.5 rating (Beginner). Their rating will adjust as you analyze games.</p>
-            <div className="flex justify-end gap-3 mt-4">
+            <div className="flex gap-3 mt-4">
               <button
                 onClick={() => setShowAdd(false)}
-                className="px-3 py-2 text-sm text-zinc-400 hover:text-zinc-200 bg-transparent border-0 cursor-pointer"
+                className="flex-1 min-h-[44px] px-4 py-3 text-sm text-zinc-400 hover:text-zinc-200 bg-zinc-800 rounded-xl border-0 cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAdd}
                 disabled={!newName.trim()}
-                className="px-4 py-2 bg-pickle text-zinc-950 rounded-lg text-sm font-medium hover:bg-pickle-dark disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer border-0"
+                className="flex-1 min-h-[44px] px-4 py-3 bg-pickle text-zinc-950 rounded-xl text-sm font-medium hover:bg-pickle-dark disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer border-0"
               >
                 Add Player
               </button>
@@ -90,9 +90,9 @@ export function PlayersPage() {
           action={
             <button
               onClick={() => setShowAdd(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-pickle text-zinc-950 rounded-lg text-sm font-medium hover:bg-pickle-dark cursor-pointer border-0"
+              className="flex items-center gap-2 px-5 py-3 min-h-[44px] bg-pickle text-zinc-950 rounded-xl text-sm font-medium hover:bg-pickle-dark cursor-pointer border-0"
             >
-              <Plus size={16} />
+              <Plus size={18} />
               Add First Player
             </button>
           }
@@ -113,9 +113,9 @@ export function PlayersPage() {
                     e.stopPropagation();
                     handleDelete(player.id);
                   }}
-                  className="absolute top-3 right-3 p-1.5 rounded-lg bg-transparent text-zinc-600 hover:text-red-400 hover:bg-red-400/10 opacity-0 group-hover:opacity-100 transition-all cursor-pointer border-0"
+                  className="absolute top-3 right-3 p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-transparent text-zinc-600 hover:text-red-400 hover:bg-red-400/10 sm:opacity-0 sm:group-hover:opacity-100 transition-all cursor-pointer border-0"
                 >
-                  <Trash2 size={14} />
+                  <Trash2 size={16} />
                 </button>
                 <div className="flex items-center gap-3 mb-4">
                   <PlayerAvatar name={player.name} avatar_url={player.avatar_url} size="lg" />

@@ -1,28 +1,54 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useSyncExternalStore } from 'react';
 
-type Theme = 'dark' | 'light';
+export type ThemePreference = 'system' | 'light' | 'dark';
+export type ResolvedTheme = 'light' | 'dark';
 
 const THEME_KEY = 'pickle_rankings_theme';
 
-export function useTheme() {
-  const [theme, setTheme] = useState<Theme>(() => {
+const mq = typeof window !== 'undefined'
+  ? window.matchMedia('(prefers-color-scheme: dark)')
+  : null;
+
+function getSystemTheme(): ResolvedTheme {
+  return mq?.matches ? 'dark' : 'light';
+}
+
+function getStoredPreference(): ThemePreference {
+  try {
     const stored = localStorage.getItem(THEME_KEY);
-    return (stored as Theme) || 'dark';
-  });
+    if (stored === 'light' || stored === 'dark' || stored === 'system') return stored;
+  } catch { /* noop */ }
+  return 'system';
+}
+
+function applyTheme(resolved: ResolvedTheme) {
+  const root = document.documentElement;
+  root.classList.remove('dark', 'light');
+  root.classList.add(resolved);
+}
+
+export function useTheme() {
+  const [theme, setThemeState] = useState<ThemePreference>(getStoredPreference);
+
+  const systemTheme = useSyncExternalStore(
+    (cb) => {
+      mq?.addEventListener('change', cb);
+      return () => mq?.removeEventListener('change', cb);
+    },
+    getSystemTheme,
+    () => 'dark' as ResolvedTheme,
+  );
+
+  const resolvedTheme: ResolvedTheme = theme === 'system' ? systemTheme : theme;
 
   useEffect(() => {
-    localStorage.setItem(THEME_KEY, theme);
-    const root = document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-      root.classList.remove('light');
-    } else {
-      root.classList.add('light');
-      root.classList.remove('dark');
-    }
-  }, [theme]);
+    applyTheme(resolvedTheme);
+  }, [resolvedTheme]);
 
-  const toggle = () => setTheme(t => (t === 'dark' ? 'light' : 'dark'));
+  const setTheme = (next: ThemePreference) => {
+    localStorage.setItem(THEME_KEY, next);
+    setThemeState(next);
+  };
 
-  return { theme, toggle };
+  return { theme, resolvedTheme, setTheme };
 }
