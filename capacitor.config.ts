@@ -5,6 +5,7 @@ const config: CapacitorConfig = {
   appName: 'Pickle Rankings',
   webDir: 'dist',
   server: {
+    url: 'https://pickle-rankings.vercel.app',
     allowNavigation: ['pickle-rankings.vercel.app', '*.vercel-storage.com'],
   },
   ios: {
