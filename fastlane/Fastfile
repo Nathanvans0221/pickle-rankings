@@ -26,6 +26,11 @@ platform :ios do
       path: "ios/App/App.xcodeproj"
     )
 
+    increment_build_number(
+      build_number: ENV["GITHUB_RUN_NUMBER"] || "2",
+      xcodeproj: "ios/App/App.xcodeproj"
+    )
+
     build_app(
       workspace: "ios/App/App.xcworkspace",
       scheme: "App",
